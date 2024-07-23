@@ -1,0 +1,37 @@
+# Ignore all files in the media directory
+/media/
+
+# Ignore all files in the venv directory
+/venv/
+
+# Ignore .env file
+.env
+
+# Optionally, you can add other common ignore patterns
+# Ignore binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Ignore output of the go coverage tool
+*.out
+
+# Ignore IDE/editor configurations
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Ignore GoLand configuration files
+/.idea/
+
+# Ignore macOS files
+.DS_Store
+
+# Ignore Linux files
+*~
+
+# Ignore log files
+*.log
