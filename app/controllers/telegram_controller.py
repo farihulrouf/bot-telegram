@@ -1,12 +1,13 @@
 import logging
 from telethon.errors import SessionPasswordNeededError
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, utils
 from telethon.tl.types import PeerChannel
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 import asyncio
 import os
+
 logging.basicConfig(level=logging.DEBUG)
 
 media_dirs = ['media/photos/', 'media/videos/', 'media/files/']
@@ -73,9 +74,6 @@ async def verify(code: VerificationCode):
         await client.disconnect()
         raise Exception(f"Failed to verify code: {str(e)}")
 
-
-
-
 async def get_channel_messages(phone: str, channel_username: str, limit: int = 10):
     client = sessions.get(phone)
     if not client:
@@ -104,10 +102,13 @@ async def get_channel_messages(phone: str, channel_username: str, limit: int = 1
         result = []
         for message in messages.messages:
             logging.debug(f"Message: {message}")
-
+            sender_username = None
+            if message.sender_id:
+                sender_entity = await client.get_entity(message.sender_id)
+                sender_username = sender_entity.username
             message_data = {
-                "sender_id": message.sender_id,
-                "chat_id": message.chat_id,
+                "username": sender_username,
+                "sender_id": utils.resolve_id(message.sender_id)[0],
                 "text": message.message if message.message else "",
                 "date": message.date.isoformat(),
                 "media": None
