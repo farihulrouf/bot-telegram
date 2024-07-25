@@ -1,16 +1,19 @@
-from pydantic import BaseModel
 from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.types import PeerUser
-from dotenv import load_dotenv
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from pydantic import BaseModel
 import os
 import asyncio
+import requests
+import logging
+from dotenv import load_dotenv
 
 # Muat variabel lingkungan dari file .env
 load_dotenv()
 
 api_id = os.getenv('API_ID')
 api_hash = os.getenv('API_HASH')
+webhook_url = 'https://webhook.site/83bbc39c-2e06-4370-bf5e-1e1fbf7c9144'
 
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
@@ -36,21 +39,42 @@ async def read_messages(phone: str):
     if not client.is_connected():
         await client.connect()
 
-    messages = []
+    async def handle_message(event):
+        # Buat payload untuk dikirim ke webhook
+        payload = {
+            'sender_id': event.sender_id,
+            'chat_id': event.chat_id,
+            'message': event.message.message,
+            'date': event.message.date.isoformat()
+        }
 
-    async def handler(event):
-        messages.append({
-            "sender_id": event.sender_id,
-            "text": event.message.text,
-            "chat_id": event.chat_id
-        })
+        print("Received message:")
+        print(f"Sender ID: {event.sender_id}")
+        print(f"Chat ID: {event.chat_id}")
+        print(f"Message: {event.message.message}")
+        print(f"Date: {event.message.date.isoformat()}")
 
-    client.add_event_handler(handler, events.NewMessage)
+        # Tambahkan media jika ada
+        if isinstance(event.message.media, MessageMediaPhoto):
+            payload['media'] = 'photo'
+        elif isinstance(event.message.media, MessageMediaDocument):
+            payload['media'] = 'document'
+        
+        # Kirim payload ke webhook
+        try:
+            response = requests.post(webhook_url, json=payload)
+            response.raise_for_status()
+            logging.info(f"Payload sent successfully: {payload}")
+        except requests.exceptions.RequestException as e:
+            logging.error(f"Failed to send payload: {e}")
 
-    await asyncio.sleep(10)  # Tunggu 10 detik atau sesuaikan sesuai kebutuhan
+    # Tambahkan event handler untuk menangani pesan baru
+    client.add_event_handler(handle_message, events.NewMessage)
 
+    # Tunggu selama 10 detik atau sesuai kebutuhan
+    await asyncio.sleep(10)
+
+    # Hentikan koneksi
     await client.disconnect()
-    return {"status": "messages_received", "messages": messages}
-
-
-
+    
+    return {"status": "messages_received"}
