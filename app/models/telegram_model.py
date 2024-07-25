@@ -31,6 +31,7 @@ def create_client(phone: str) -> TelegramClient:
     session_file = f"sessions/{phone}.session"
     return TelegramClient(session_file, int(api_id), api_hash)
 
+
 async def read_messages(phone: str):
     client = sessions.get(phone)
     if not client:
@@ -71,10 +72,12 @@ async def read_messages(phone: str):
     # Tambahkan event handler untuk menangani pesan baru
     client.add_event_handler(handle_message, events.NewMessage)
 
-    # Tunggu selama 10 detik atau sesuai kebutuhan
-    await asyncio.sleep(10)
-
-    # Hentikan koneksi
-    await client.disconnect()
+    # Menjaga agar client tetap terhubung dan aktif untuk memproses pesan
+    try:
+        await client.run_until_disconnected()
+    except KeyboardInterrupt:
+        print("Disconnected due to user interrupt")
+    finally:
+        await client.disconnect()
     
     return {"status": "messages_received"}
