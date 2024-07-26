@@ -1,10 +1,11 @@
 import logging
 from telethon.errors import SessionPasswordNeededError
-from telethon import TelegramClient, events, utils
+from telethon import TelegramClient, events, utils, errors
 from telethon.tl.types import PeerChannel
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.functions.channels import JoinChannelRequest
 import asyncio
 import os
 
@@ -73,6 +74,23 @@ async def verify(code: VerificationCode):
     except Exception as e:
         await client.disconnect()
         raise Exception(f"Failed to verify code: {str(e)}")
+    
+async def join_channel(channel_username, phone_number, client):
+    try:
+        await client.start(phone_number)
+        # Bergabung dengan saluran
+        await client(JoinChannelRequest(channel_username))
+        print(f"Successfully joined the channel: {channel_username}")
+    except errors.FloodWaitError as e:
+        print(f"Must wait for {e.seconds} seconds before trying again.")
+    except errors.InviteHashExpiredError:
+        print("The invite link has expired.")
+    except errors.InviteHashInvalidError:
+        print("The invite link is invalid.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+    finally:
+        await client.disconnect()
 
 async def get_channel_messages(phone: str, channel_username: str, limit: int = 10):
     client = sessions.get(phone)

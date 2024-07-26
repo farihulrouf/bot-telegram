@@ -1,11 +1,15 @@
 from fastapi import FastAPI
 import asyncio
 from app.models.telegram_model import create_client, read_messages, PhoneNumber, sessions
+from app.views import telegram_view
 
 app = FastAPI()
 
 # Nomor telepon yang digunakan
 phone_number = '+6285280933757'  # Ganti dengan nomor telepon Anda
+
+# Mengimpor router
+app.include_router(telegram_view.router)
 
 @app.on_event("startup")
 async def startup_event():
