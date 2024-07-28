@@ -1,11 +1,11 @@
 import logging
 from telethon.errors import SessionPasswordNeededError , FloodWaitError, InviteHashExpiredError, InviteHashInvalidError
 from telethon import TelegramClient, events, utils, errors
-from telethon.tl.types import PeerChannel
+from telethon.tl.types import PeerChannel, ChannelFull
 from telethon.tl.functions.messages import GetHistoryRequest
-from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll
+from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
-from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest
 import asyncio
 import os
 import re
@@ -312,7 +312,6 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
     finally:
         await client.disconnect()
 
-
 async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
     client = sessions.get(phone)
     if not client:
@@ -348,3 +347,38 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
         logging.error(f"Failed to get channels: {str(e)}")
         await client.disconnect()
         raise Exception(f"Failed to get channels: {str(e)}")
+    
+
+async def get_channel_details(phone: str, channel_username: str):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+    
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        if channel_username.startswith('@'):
+            channel_username = channel_username[1:]
+
+        entity = await client.get_entity(channel_username)
+        full_channel = await client(GetFullChannelRequest(channel=entity))
+
+        # Handle None values by providing a default value
+        channel_info = {
+            "id": entity.id,
+            "name": entity.title,
+            "username": entity.username,
+            "participants_count": full_channel.full_chat.participants_count or 0,
+            "admins_count": full_channel.full_chat.admins_count or 0,
+            "banned_count": full_channel.full_chat.kicked_count or 0,
+            "description": full_channel.full_chat.about or "",
+            "created_at": entity.date.isoformat()
+        }
+
+        await client.disconnect()
+        return {"status": "success", "channel_info": channel_info}
+
+    except Exception as e:
+        await client.disconnect()
+        raise Exception(f"Failed to get channel details: {str(e)}")
