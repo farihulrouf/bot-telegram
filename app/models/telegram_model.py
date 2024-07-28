@@ -18,6 +18,10 @@ webhook_url = 'https://webhook.site/83bbc39c-2e06-4370-bf5e-1e1fbf7c9144'
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
 
+class JoinRequest(BaseModel):
+    phone: str
+    username_channel: str
+
 class PhoneNumber(BaseModel):
     phone: str
 
@@ -63,8 +67,8 @@ async def read_messages(phone: str):
         
         # Kirim payload ke webhook
         try:
-            response = requests.post(webhook_url, json=payload)
-            response.raise_for_status()
+            #response = requests.post(webhook_url, json=payload)
+            #response.raise_for_status()
             logging.info(f"Payload sent successfully: {payload}")
         except requests.exceptions.RequestException as e:
             logging.error(f"Failed to send payload: {e}")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from app.models.telegram_model import PhoneNumber, VerificationCode
+from app.models.telegram_model import PhoneNumber, VerificationCode, JoinRequest
 from app.controllers import telegram_controller
 
 router = APIRouter()
@@ -41,3 +41,13 @@ async def get_message(phone: str = Query(...), channel_username: str = Query(...
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+@router.post("/api/join/subscribe")
+async def join_channel(request: JoinRequest):
+    try:
+        response = await telegram_controller.join_subscribe(request.phone, request.username_channel)
+        if response["status"] == "error":
+            raise HTTPException(status_code=400, detail=response["message"])
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
