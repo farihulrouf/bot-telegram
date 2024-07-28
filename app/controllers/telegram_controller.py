@@ -1,14 +1,15 @@
 import logging
 from telethon.errors import SessionPasswordNeededError , FloodWaitError, InviteHashExpiredError, InviteHashInvalidError
-
 from telethon import TelegramClient, events, utils, errors
 from telethon.tl.types import PeerChannel
 from telethon.tl.functions.messages import GetHistoryRequest
-from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions
+from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from telethon.tl.functions.channels import JoinChannelRequest
 import asyncio
 import os
+import re
+from typing import Dict, List
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -224,5 +225,92 @@ async def join_subscribe(phone: str, username_channel: str):
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         return {"status": "error", "message": str(e)}
+    finally:
+        await client.disconnect()
+
+def extract_channel_names(text: str) -> ChannelNamesResponse:
+    # Regular expression to find words starting with @
+    channel_names = re.findall(r'@\w+', text)
+    
+    # Remove duplicates by converting to a set and back to a list
+    channel_names = list(set(channel_names))
+    
+    # Create and return a ChannelNamesResponse object
+    return ChannelNamesResponse(
+        total_channel=len(channel_names),
+        name_channel=channel_names
+    )
+
+
+async def read_and_join_channels(phone: str, channel_username: str, limit: int = 10):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+    
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        # Ensure channel_username is a string and process it
+        if not isinstance(channel_username, str):
+            raise TypeError("channel_username must be a string")
+
+        if channel_username.startswith('@'):
+            channel_username = channel_username[1:]
+
+        # Get the entity for the channel
+        entity = await client.get_entity(channel_username)
+        
+        # Get recent messages from the channel
+        messages = await client(GetHistoryRequest(
+            peer=entity,
+            offset_id=0,
+            offset_date=None,
+            add_offset=0,
+            limit=limit,
+            max_id=0,
+            min_id=0,
+            hash=0
+        ))
+
+        all_channel_names = []
+        total_message_read = 0
+        
+        for message in messages.messages:
+            if message.message:
+                # Extract channel names from message text
+                response: ChannelNamesResponse = extract_channel_names(message.message)
+                all_channel_names.extend(response.name_channel)
+                total_message_read += 1
+        
+        # Remove duplicates
+        all_channel_names = list(set(all_channel_names))
+        
+        # Join each channel
+        join_responses = []
+        for channel in all_channel_names:
+            if channel.startswith('@'):
+                channel = channel[1:]
+            
+            try:
+                await client(JoinChannelRequest(channel))
+                join_responses.append({"channel": channel, "status": "joined"})
+            except FloodWaitError as e:
+                join_responses.append({"channel": channel, "status": f"flood_wait_error: {e.seconds} seconds"})
+            except InviteHashExpiredError:
+                join_responses.append({"channel": channel, "status": "invite_hash_expired"})
+            except InviteHashInvalidError:
+                join_responses.append({"channel": channel, "status": "invite_hash_invalid"})
+            except Exception as e:
+                join_responses.append({"channel": channel, "status": f"error: {str(e)}"})
+
+        return {
+            "status": "completed",
+            "total_message_read": total_message_read,
+            "join_responses": join_responses
+        }
+    
+    except Exception as e:
+        raise Exception(f"Failed to read messages and join channels: {str(e)}")
     finally:
         await client.disconnect()
