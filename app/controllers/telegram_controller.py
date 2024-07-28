@@ -3,7 +3,7 @@ from telethon.errors import SessionPasswordNeededError , FloodWaitError, InviteH
 from telethon import TelegramClient, events, utils, errors
 from telethon.tl.types import PeerChannel
 from telethon.tl.functions.messages import GetHistoryRequest
-from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse
+from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from telethon.tl.functions.channels import JoinChannelRequest
 import asyncio
@@ -195,8 +195,6 @@ async def get_channel_messages(phone: str, channel_username: str, limit: int = 1
         await client.disconnect()
         raise Exception(f"Failed to get messages: {str(e)}")
     
-
-
 async def join_subscribe(phone: str, username_channel: str):
     client = sessions.get(phone)
     if not client:
@@ -240,7 +238,6 @@ def extract_channel_names(text: str) -> ChannelNamesResponse:
         total_channel=len(channel_names),
         name_channel=channel_names
     )
-
 
 async def read_and_join_channels(phone: str, channel_username: str, limit: int = 10):
     client = sessions.get(phone)
@@ -314,3 +311,40 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
         raise Exception(f"Failed to read messages and join channels: {str(e)}")
     finally:
         await client.disconnect()
+
+
+async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
+    client = sessions.get(phone)
+    if not client:
+        logging.error(f"Session not found for phone: {phone}")
+        raise Exception("Session not found")
+    logging.debug(f"Session found for phone: {phone}")
+
+    if not client.is_connected():
+        logging.debug(f"Connecting client for phone: {phone}")
+        await client.connect()
+
+    try:
+        dialogs = await client.get_dialogs()
+        logging.debug(f"Retrieved dialogs for phone: {phone}")
+
+        channels = [
+            {'name_channel': f"@{dialog.entity.username}"}
+            for dialog in dialogs
+            if dialog.is_channel and dialog.entity.username
+        ]
+        logging.debug(f"Extracted channel names for phone: {phone}")
+
+        await client.disconnect()
+        logging.debug(f"Client disconnected for phone: {phone}")
+
+        response = ChannelNamesResponseAll(
+            total_channels=len(channels),
+            channels=channels
+        )
+        
+        return response
+    except Exception as e:
+        logging.error(f"Failed to get channels: {str(e)}")
+        await client.disconnect()
+        raise Exception(f"Failed to get channels: {str(e)}")

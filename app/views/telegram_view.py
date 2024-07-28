@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from app.models.telegram_model import PhoneNumber, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse
+from app.models.telegram_model import PhoneNumber, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
 from app.controllers import telegram_controller
 from typing import Dict
 
@@ -67,5 +67,14 @@ async def read_message(
         # Call the controller function to read messages and join channels
         result = await telegram_controller.read_and_join_channels(phone, channel_username, limit)
         return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# Tambahkan endpoint untuk mendapatkan semua channel
+@router.get("/api/getallchannels", response_model=ChannelNamesResponseAll)
+async def get_all_channel(phone: str):
+    try:
+        response = await telegram_controller.get_all_channels(phone)
+        return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

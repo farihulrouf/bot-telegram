@@ -5,7 +5,7 @@ from pydantic import BaseModel
 import os
 import asyncio
 import requests
-from typing import List
+from typing import Dict, List
 import logging
 from dotenv import load_dotenv
 
@@ -19,6 +19,10 @@ webhook_url = 'https://webhook.site/83bbc39c-2e06-4370-bf5e-1e1fbf7c9144'
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
 
+class ChannelNamesResponseAll(BaseModel):
+    total_channels: int
+    channels: List[Dict[str, str]]
+    
 class SendMessageRequest(BaseModel):
     phone: str
     recipient: str
