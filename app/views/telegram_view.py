@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from app.models.telegram_model import PhoneNumber, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
+from app.models.telegram_model import PhoneNumber, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
 from app.controllers import telegram_controller
-from typing import Dict
+from typing import Dict, List
 
 router = APIRouter()
 
@@ -80,7 +80,6 @@ async def get_all_channel(phone: str):
         raise HTTPException(status_code=500, detail=str(e))
     
 
-
 @router.get("/api/getchannel", response_model=ChannelDetailResponse)
 async def get_channel_details(phone: str = Query(...), channel_username: str = Query(...)):
     try:
@@ -91,3 +90,26 @@ async def get_channel_details(phone: str = Query(...), channel_username: str = Q
             raise HTTPException(status_code=400, detail="Failed to get channel details")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.get("/api/getcontacts", response_model=List[ContactResponse])
+async def get_all_contacts(phone: str = Query(...)):
+    try:
+        response = await telegram_controller.get_all_contacts(phone)
+        if response["status"] == "success":
+            return response["contacts"]
+        else:
+            raise HTTPException(status_code=400, detail="Failed to get contacts")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+
+@router.get("/api/get_user_details")
+async def get_user_details(phone: str = Query(...), username: str = Query(...)):
+    try:
+        response = await telegram_controller.get_user_details(phone, username)
+        if "error" in response:
+            raise HTTPException(status_code=400, detail=response["error"])
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    

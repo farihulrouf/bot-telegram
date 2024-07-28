@@ -2,6 +2,7 @@ from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from pydantic import BaseModel
+from typing import Optional
 import os
 import asyncio
 import requests
@@ -19,6 +20,13 @@ webhook_url = 'https://webhook.site/83bbc39c-2e06-4370-bf5e-1e1fbf7c9144'
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
 
+
+class ContactResponse(BaseModel):
+    id: int
+    first_name: Optional[str]
+    last_name: Optional[str]
+    phone: Optional[str]
+    username: Optional[str]
 
 class ChannelDetailResponse(BaseModel):
     id: int

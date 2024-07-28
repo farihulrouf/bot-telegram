@@ -1,12 +1,15 @@
 import logging
 from telethon.errors import SessionPasswordNeededError , FloodWaitError, InviteHashExpiredError, InviteHashInvalidError
 from telethon import TelegramClient, events, utils, errors
-from telethon.tl.types import PeerChannel, ChannelFull
-from telethon.tl.functions.messages import GetHistoryRequest
+from telethon.tl.types import PeerChannel, UserProfilePhoto, ChannelFull, InputPhoneContact, InputUser, ChannelParticipantsSearch
+from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.functions.users import GetFullUserRequest
+from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
-from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest
+from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest, GetParticipantsRequest
 import asyncio
+import base64
 import os
 import re
 from typing import Dict, List
@@ -348,7 +351,6 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
         await client.disconnect()
         raise Exception(f"Failed to get channels: {str(e)}")
     
-
 async def get_channel_details(phone: str, channel_username: str):
     client = sessions.get(phone)
     if not client:
@@ -382,3 +384,67 @@ async def get_channel_details(phone: str, channel_username: str):
     except Exception as e:
         await client.disconnect()
         raise Exception(f"Failed to get channel details: {str(e)}")
+
+async def get_all_contacts(phone: str):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+    
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        contacts = await client(GetContactsRequest(hash=0))
+        contact_list = []
+
+        for contact in contacts.users:
+            contact_info = {
+                "id": contact.id,
+                "first_name": contact.first_name,
+                "last_name": contact.last_name,
+                "phone": contact.phone,
+                "username": contact.username
+            }
+            contact_list.append(contact_info)
+        
+        await client.disconnect()
+        return {"status": "success", "contacts": contact_list}
+
+    except Exception as e:
+        await client.disconnect()
+        raise Exception(f"Failed to get contacts: {str(e)}")
+
+async def get_user_details(phone: str, username: str):
+    client = sessions.get(phone)
+    
+    if not client:
+        return {"error": "Session not found or user not logged in"}
+
+    try:
+        user = await client.get_input_entity(username)
+        full_user = await client(GetFullUserRequest(user))
+        #print(full_user)
+        # Extracting user details from the full_user object
+        user_details = {
+            "id": full_user.users[0].id,
+            "username": full_user.users[0].username,
+            "first_name": full_user.users[0].first_name,
+            "last_name": full_user.users[0].last_name,
+            "phone": full_user.users[0].phone,
+            "bio": full_user.full_user.about,
+        }
+        
+        # Handling profile photo
+        if isinstance(full_user.full_user.profile_photo, UserProfilePhoto):
+            profile_photo = full_user.full_user.profile_photo
+            # Here you can convert the photo reference to a base64 string or URL
+            # For simplicity, we'll convert the file reference to base64
+            photo_reference = base64.b64encode(profile_photo.file_reference).decode('utf-8')
+            user_details["profile_photo"] = photo_reference
+        else:
+            user_details["profile_photo"] = None
+        
+        return user_details
+    except Exception as e:
+        return {"error": str(e)}
+
