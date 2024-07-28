@@ -21,6 +21,13 @@ for media_dir in media_dirs:
     if not os.path.exists(media_dir):
         os.makedirs(media_dir)
 
+async def upload_file_to_server(file_path, server_url):
+    file_name = os.path.basename(file_path)
+    with open(file_path, "rb") as file:
+        response = requests.post(server_url, files={"file": (file_name, file)})
+    return response.json()
+
+
 async def send_message(phone: str, recipient: str, message: str):
     client = sessions.get(phone)
     if not client:
