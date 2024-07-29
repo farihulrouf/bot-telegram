@@ -12,20 +12,18 @@ import asyncio
 import base64
 import os
 import re
+import io
+import paramiko
+from dotenv import load_dotenv
+
 from typing import Dict, List
+load_dotenv()
 
+SERVER_IP = os.getenv('SERVER_IP')
+SFTP_USERNAME = os.getenv('SFTP_USERNAME')
+SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
+PASSPHRASE = os.getenv('PASSPHRASE')
 logging.basicConfig(level=logging.DEBUG)
-
-media_dirs = ['media/photos/', 'media/videos/', 'media/files/']
-for media_dir in media_dirs:
-    if not os.path.exists(media_dir):
-        os.makedirs(media_dir)
-
-async def upload_file_to_server(file_path, server_url):
-    file_name = os.path.basename(file_path)
-    with open(file_path, "rb") as file:
-        response = requests.post(server_url, files={"file": (file_name, file)})
-    return response.json()
 
 
 async def send_message(phone: str, recipient: str, message: str):
@@ -104,107 +102,6 @@ async def join_channel(channel_username, phone_number, client):
     finally:
         await client.disconnect()
 
-async def get_channel_messages(phone: str, channel_username: str, limit: int = 10):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-    logging.debug(f"Session found for phone: {phone}")
-
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        if channel_username.startswith('@'):
-            channel_username = channel_username[1:]
-
-        entity = await client.get_entity(channel_username)
-        messages = await client(GetHistoryRequest(
-            peer=entity,
-            offset_id=0,
-            offset_date=None,
-            add_offset=0,
-            limit=limit,
-            max_id=0,
-            min_id=0,
-            hash=0
-        ))
-
-        result = []
-        for message in messages.messages:
-            logging.debug(f"Message: {message}")
-            sender_username = None
-            if message.sender_id:
-                sender_entity = await client.get_entity(message.sender_id)
-                sender_username = sender_entity.username
-            message_data = {
-                "username": sender_username,
-                "sender_id": utils.resolve_id(message.sender_id)[0],
-                "text": message.message if message.message else "",
-                "date": message.date.isoformat(),
-                "media": None
-            }
-
-            try:
-                if isinstance(message.media, MessageMediaPhoto):
-                    logging.debug(f"Photo detected: {message.media.photo}")
-                    output_path = "media/photos/"
-                    if not os.path.exists(output_path):
-                        os.makedirs(output_path)
-                    media_path = await client.download_media(message.media.photo, file=output_path)
-                    logging.debug(f"Downloaded photo to: {media_path}")
-                    if media_path:
-                        message_data["media"] = {"type": "photo", "path": media_path}
-                elif isinstance(message.media, MessageMediaDocument):
-                    doc = message.media.document
-                    if doc.mime_type.startswith('video'):
-                        logging.debug(f"Video detected: {doc}")
-                        output_path = "media/videos/"
-                        if not os.path.exists(output_path):
-                            os.makedirs(output_path)
-                        media_path = await client.download_media(doc, file=output_path)
-                        logging.debug(f"Downloaded video to: {media_path}")
-                        if media_path:
-                            message_data["media"] = {"type": "video", "path": media_path}
-                    elif doc.mime_type.startswith('application'):
-                        logging.debug(f"Document detected: {doc}")
-                        output_path = "media/files/"
-                        if not os.path.exists(output_path):
-                            os.makedirs(output_path)
-                        media_path = await client.download_media(doc, file=output_path)
-                        logging.debug(f"Downloaded document to: {media_path}")
-                        if media_path:
-                            message_data["media"] = {"type": "document", "path": media_path}
-                    else:
-                        logging.debug(f"Unknown document type detected: {doc}")
-                        output_path = "media/files/"
-                        if not os.path.exists(output_path):
-                            os.makedirs(output_path)
-                        media_path = await client.download_media(doc, file=output_path)
-                        logging.debug(f"Downloaded unknown document to: {media_path}")
-                        if media_path:
-                            message_data["media"] = {"type": "unknown", "path": media_path}
-                else:
-                    logging.debug(f"Unknown media detected: {message.media}")
-                    output_path = "media/files/"
-                    if not os.path.exists(output_path):
-                        os.makedirs(output_path)
-                    media_path = await client.download_media(message.media, file=output_path)
-                    logging.debug(f"Downloaded unknown media to: {media_path}")
-                    if media_path:
-                        message_data["media"] = {"type": "unknown", "path": media_path}
-            except Exception as e:
-                logging.error(f"Error downloading media: {e}")
-                message_data["media"] = {"type": "error", "path": None}
-
-            result.append(message_data)
-
-        await client.disconnect()
-        return {"status": "messages_received", "messages": result}
-
-    except Exception as e:
-        await client.disconnect()
-        raise Exception(f"Failed to get messages: {str(e)}")
-    
 async def join_subscribe(phone: str, username_channel: str):
     client = sessions.get(phone)
     if not client:
@@ -455,3 +352,117 @@ async def get_user_details(phone: str, username: str):
     except Exception as e:
         return {"error": str(e)}
 
+
+async def upload_file_to_server(file_stream: io.BytesIO, remote_file_path: str, server_ip: str, sftp_username: str, ssh_key_path: str, passphrase: str):
+    try:
+        # Create an SSH transport object
+        transport = paramiko.Transport((server_ip, 22))
+        
+        # Load the private key with passphrase
+        private_key = paramiko.RSAKey.from_private_key_file(ssh_key_path, password=passphrase)
+        
+        # Connect to the server using the transport object and private key
+        transport.connect(username=sftp_username, pkey=private_key)
+        sftp = paramiko.SFTPClient.from_transport(transport)
+        
+        # Upload the file stream directly
+        with sftp.open(remote_file_path, 'wb') as remote_file:
+            logging.debug(f"Uploading file to {remote_file_path}")
+            remote_file.write(file_stream.getvalue())
+        
+        sftp.close()
+        transport.close()
+        logging.info(f"File uploaded successfully to {remote_file_path}")
+
+    except Exception as e:
+        logging.error(f"Error uploading file: {e}")
+
+
+async def get_channel_messages(phone: str, channel_username: str, limit: int = 10):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+    logging.debug(f"Session found for phone: {phone}")
+
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        if channel_username.startswith('@'):
+            channel_username = channel_username[1:]
+
+        entity = await client.get_entity(channel_username)
+        messages = await client(GetHistoryRequest(
+            peer=entity,
+            offset_id=0,
+            offset_date=None,
+            add_offset=0,
+            limit=limit,
+            max_id=0,
+            min_id=0,
+            hash=0
+        ))
+
+        result = []
+        for message in messages.messages:
+            logging.debug(f"Message: {message}")
+            sender_username = None
+            if message.sender_id:
+                sender_entity = await client.get_entity(message.sender_id)
+                sender_username = sender_entity.username
+            message_data = {
+                "username": sender_username,
+                "sender_id": utils.resolve_id(message.sender_id)[0],
+                "text": message.message if message.message else "",
+                "date": message.date.isoformat(),
+                "media": None
+            }
+
+            try:
+                file_stream = io.BytesIO()
+                if isinstance(message.media, MessageMediaPhoto):
+                    logging.debug(f"Photo detected: {message.media.photo}")
+                    await client.download_media(message.media.photo, file=file_stream)
+                    file_stream.seek(0)
+                    remote_file_path = f"/home/{SFTP_USERNAME}/media/photos/{message.media.photo.id}.jpg"
+                    logging.debug(f"Uploading photo to: {remote_file_path}")
+
+                    # Upload photo to server
+                    await upload_file_to_server(file_stream, remote_file_path, SERVER_IP, SFTP_USERNAME, SSH_KEY_PATH, PASSPHRASE)
+                    message_data["media"] = {"type": "photo", "path": remote_file_path}
+
+                elif isinstance(message.media, MessageMediaDocument):
+                    doc = message.media.document
+                    logging.debug(f"Document detected: {doc}")
+                    await client.download_media(doc, file=file_stream)
+                    file_stream.seek(0)
+                    remote_file_path = f"/home/{SFTP_USERNAME}/media/files/{doc.id}.bin"
+                    logging.debug(f"Uploading document to: {remote_file_path}")
+
+                    # Upload document to server
+                    await upload_file_to_server(file_stream, remote_file_path, SERVER_IP, SFTP_USERNAME, SSH_KEY_PATH, PASSPHRASE)
+                    message_data["media"] = {"type": "document", "path": remote_file_path}
+
+                else:
+                    logging.debug(f"Unknown media detected: {message.media}")
+                    await client.download_media(message.media, file=file_stream)
+                    file_stream.seek(0)
+                    remote_file_path = f"/home/{SFTP_USERNAME}/media/files/{message.media.id}.bin"
+                    logging.debug(f"Uploading unknown media to: {remote_file_path}")
+
+                    # Upload unknown media to server
+                    await upload_file_to_server(file_stream, remote_file_path, SERVER_IP, SFTP_USERNAME, SSH_KEY_PATH, PASSPHRASE)
+                    message_data["media"] = {"type": "unknown", "path": remote_file_path}
+
+            except Exception as e:
+                logging.error(f"Error downloading or uploading media: {e}")
+                message_data["media"] = {"type": "error", "path": None}
+
+            result.append(message_data)
+
+        await client.disconnect()
+        return {"status": "messages_received", "messages": result}
+
+    except Exception as e:
+        await client.disconnect()
+        raise Exception(f"Failed to get messages: {str(e)}")
