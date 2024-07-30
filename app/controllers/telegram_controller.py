@@ -148,31 +148,33 @@ def extract_channel_names(text: str) -> ChannelNamesResponse:
         name_channel=channel_names
     )
 
+
+
 async def read_and_join_channels(phone: str, channel_username: str, limit: int = 10):
     client = sessions.get(phone)
     if not client:
-        raise Exception("Session tidak ditemukan")
-    
+        raise Exception("Session not found")
+
     if not client.is_connected():
         await client.connect()
 
     try:
-        # Pastikan channel_username adalah string dan proses
         if not isinstance(channel_username, str):
-            raise TypeError("channel_username harus berupa string")
+            raise TypeError("channel_username must be a string")
 
         if channel_username.startswith('@'):
             channel_username = channel_username[1:]
 
-        # Dapatkan entitas untuk channel
+        # Get the entity for the channel
         entity = await client.get_entity(channel_username)
-        
-        all_messages = []
+
+        all_channel_names = []
+        total_message_read = 0
         offset_id = 0
-        
-        # Baca pesan dalam batch
-        while limit > 0:
-            batch_limit = min(limit, 100)  # Batasan GetHistoryRequest Telegram
+        remaining_limit = limit
+
+        while remaining_limit > 0:
+            batch_limit = min(remaining_limit, 100)  # Maximum number of messages per batch is 100
             messages = await client(GetHistoryRequest(
                 peer=entity,
                 offset_id=offset_id,
@@ -187,34 +189,31 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
             if not messages.messages:
                 break
 
-            all_messages.extend(messages.messages)
-            limit -= batch_limit
-            offset_id = messages.messages[-1].id
+            for message in messages.messages:
+                if message.message:
+                    # Extract channel names from message text
+                    response: ChannelNamesResponse = extract_channel_names(message.message)
+                    all_channel_names.extend(response.name_channel)
+                    total_message_read += 1
 
-        all_channel_names = []
-        total_message_read = 0
-        
-        for message in all_messages:
-            if message.message:
-                # Ekstrak nama channel dari teks pesan
-                response: ChannelNamesResponse = extract_channel_names(message.message)
-                all_channel_names.extend(response.name_channel)
-                total_message_read += 1
-        
-        # Hapus duplikat
+            # Update the offset_id for the next batch
+            offset_id = messages.messages[-1].id
+            remaining_limit -= len(messages.messages)
+
+        # Remove duplicates
         all_channel_names = list(set(all_channel_names))
-        
-        # Bergabung dengan setiap channel
+
+        # Join each channel
         join_responses = []
         for channel in all_channel_names:
             if channel.startswith('@'):
                 channel = channel[1:]
-            
+
             try:
                 await client(JoinChannelRequest(channel))
-                join_responses.append({"channel": channel, "status": "bergabung"})
+                join_responses.append({"channel": channel, "status": "joined"})
             except FloodWaitError as e:
-                join_responses.append({"channel": channel, "status": f"flood_wait_error: {e.seconds} detik"})
+                join_responses.append({"channel": channel, "status": f"flood_wait_error: {e.seconds} seconds"})
             except InviteHashExpiredError:
                 join_responses.append({"channel": channel, "status": "invite_hash_expired"})
             except InviteHashInvalidError:
@@ -227,12 +226,11 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
             "total_message_read": total_message_read,
             "join_responses": join_responses
         }
-    
+
     except Exception as e:
-        raise Exception(f"Gagal membaca pesan dan bergabung dengan channel: {str(e)}")
+        raise Exception(f"Failed to read messages and join channels: {str(e)}")
     finally:
         await client.disconnect()
-
 
 async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
     client = sessions.get(phone)
