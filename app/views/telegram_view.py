@@ -57,14 +57,15 @@ async def get_channel_names(request: TextRequest) -> ChannelNamesResponse:
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+
 @router.get("/api/readmessage")
 async def read_message(
     phone: str = Query(...),
-    channel_username: str = Query(...),  # Ensure this is a string
-    limit: int = Query(10, le=100)
-):
+    channel_username: str = Query(...),  # Pastikan ini adalah string
+    limit: int = Query(10)
+    ):
     try:
-        # Call the controller function to read messages and join channels
+        # Panggil fungsi controller untuk membaca pesan dan bergabung dengan channel
         result = await telegram_controller.read_and_join_channels(phone, channel_username, limit)
         return result
     except Exception as e:

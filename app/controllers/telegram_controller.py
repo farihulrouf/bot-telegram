@@ -151,48 +151,60 @@ def extract_channel_names(text: str) -> ChannelNamesResponse:
 async def read_and_join_channels(phone: str, channel_username: str, limit: int = 10):
     client = sessions.get(phone)
     if not client:
-        raise Exception("Session not found")
+        raise Exception("Session tidak ditemukan")
     
     if not client.is_connected():
         await client.connect()
 
     try:
-        # Ensure channel_username is a string and process it
+        # Pastikan channel_username adalah string dan proses
         if not isinstance(channel_username, str):
-            raise TypeError("channel_username must be a string")
+            raise TypeError("channel_username harus berupa string")
 
         if channel_username.startswith('@'):
             channel_username = channel_username[1:]
 
-        # Get the entity for the channel
+        # Dapatkan entitas untuk channel
         entity = await client.get_entity(channel_username)
         
-        # Get recent messages from the channel
-        messages = await client(GetHistoryRequest(
-            peer=entity,
-            offset_id=0,
-            offset_date=None,
-            add_offset=0,
-            limit=limit,
-            max_id=0,
-            min_id=0,
-            hash=0
-        ))
+        all_messages = []
+        offset_id = 0
+        
+        # Baca pesan dalam batch
+        while limit > 0:
+            batch_limit = min(limit, 100)  # Batasan GetHistoryRequest Telegram
+            messages = await client(GetHistoryRequest(
+                peer=entity,
+                offset_id=offset_id,
+                offset_date=None,
+                add_offset=0,
+                limit=batch_limit,
+                max_id=0,
+                min_id=0,
+                hash=0
+            ))
+
+            if not messages.messages:
+                break
+
+            all_messages.extend(messages.messages)
+            limit -= batch_limit
+            offset_id = messages.messages[-1].id
 
         all_channel_names = []
         total_message_read = 0
         
-        for message in messages.messages:
+        for message in all_messages:
             if message.message:
-                # Extract channel names from message text
+                # Ekstrak nama channel dari teks pesan
                 response: ChannelNamesResponse = extract_channel_names(message.message)
                 all_channel_names.extend(response.name_channel)
                 total_message_read += 1
         
-        # Remove duplicates
+        # Hapus duplikat
         all_channel_names = list(set(all_channel_names))
         
-        # Join each channel
+        # Bergabung dengan setiap channel
         join_responses = []
         for channel in all_channel_names:
             if channel.startswith('@'):
@@ -200,9 +212,9 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
             
             try:
                 await client(JoinChannelRequest(channel))
-                join_responses.append({"channel": channel, "status": "joined"})
+                join_responses.append({"channel": channel, "status": "bergabung"})
             except FloodWaitError as e:
-                join_responses.append({"channel": channel, "status": f"flood_wait_error: {e.seconds} seconds"})
+                join_responses.append({"channel": channel, "status": f"flood_wait_error: {e.seconds} detik"})
             except InviteHashExpiredError:
                 join_responses.append({"channel": channel, "status": "invite_hash_expired"})
             except InviteHashInvalidError:
@@ -217,9 +229,10 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
         }
     
     except Exception as e:
-        raise Exception(f"Failed to read messages and join channels: {str(e)}")
+        raise Exception(f"Gagal membaca pesan dan bergabung dengan channel: {str(e)}")
     finally:
         await client.disconnect()
+
 
 async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
     client = sessions.get(phone)
