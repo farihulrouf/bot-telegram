@@ -31,7 +31,11 @@ async def verify(code: VerificationCode):
         raise HTTPException(status_code=400, detail=str(e))
 
 @router.get("/api/get_message")
-async def get_message(phone: str = Query(...), channel_username: str = Query(...), limit: int = Query(10, le=100)):
+async def get_message(
+    phone: str = Query(...),
+    channel_username: str = Query(...),
+    limit: int = Query(10)  # Removed the maximum limit constraint
+):
     try:
         response = await telegram_controller.get_channel_messages(phone, channel_username, limit)
         return response
