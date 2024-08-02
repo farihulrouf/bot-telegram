@@ -15,12 +15,18 @@ load_dotenv()
 
 api_id = os.getenv('API_ID')
 api_hash = os.getenv('API_HASH')
-webhook_url = 'https://webhook.site/83bbc39c-2e06-4370-bf5e-1e1fbf7c9144'
+webhook_url = 'http://localhost:8000/api/webhook'
 
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
 
-
+class WebhookPayload(BaseModel):
+    sender_id: int
+    chat_id: int
+    message: str
+    date: str
+    media: str = None
+    
 class ContactResponse(BaseModel):
     id: int
     first_name: Optional[str]

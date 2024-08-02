@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from app.models.telegram_model import PhoneNumber, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
+from app.models.telegram_model import PhoneNumber,WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
 from app.controllers import telegram_controller
 from typing import Dict, List
 
@@ -117,4 +117,12 @@ async def get_user_details(phone: str = Query(...), username: str = Query(...)):
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+
+@router.post("/api/webhook")
+async def receive_webhook(payload: WebhookPayload):
+    # Proses data webhook di sini
+    print("Webhook received:")
+    print(payload.dict())
+
+    # Contoh: Kirim respons untuk mengonfirmasi bahwa webhook diterima
+    return {"status": "success"}

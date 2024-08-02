@@ -8,6 +8,7 @@ from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
 from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest, GetParticipantsRequest
+from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
 import asyncio
 import base64
 import os
@@ -25,7 +26,7 @@ SERVER_IP = os.getenv('SERVER_IP')
 SFTP_USERNAME = os.getenv('SFTP_USERNAME')
 SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
 PASSPHRASE = os.getenv('PASSPHRASE')
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 
 async def send_message(phone: str, recipient: str, message: str):
@@ -390,17 +391,15 @@ async def upload_file_to_server(file_stream: io.BytesIO, remote_file_path: str, 
     except Exception as e:
         logging.error(f"Error uploading file: {e}")
 
-
-
-
 async def get_channel_messages(
     phone: str, 
     channel_username: str, 
     limit: int = 10,
-    server_ip: str = os.getenv('SERVER_IP'),
-    sftp_username: str = os.getenv('SFTP_USERNAME'),
-    ssh_key_path: str = os.getenv('SSH_KEY_PATH'),
-    passphrase: str = os.getenv('PASSPHRASE')
+    endpoint: str = os.getenv('SPACES_ENDPOINT'),
+    bucket: str = os.getenv('SPACES_BUCKET'),
+    folder: str = os.getenv('SPACES_FOLDER'),
+    access_key: str = os.getenv('SPACES_ACCESS_KEY'),
+    secret_key: str = os.getenv('SPACES_SECRET_KEY')
 ):
     client = sessions.get(phone)
     if not client:
@@ -415,13 +414,14 @@ async def get_channel_messages(
             channel_username = channel_username[1:]
 
         entity = await client.get_entity(channel_username)
+        channel_id = entity.id
 
         result = []
         offset_id = 0
         remaining_limit = limit
 
         while remaining_limit > 0:
-            batch_limit = min(remaining_limit, 100)  # Fetch messages in batches of up to 100
+            batch_limit = min(remaining_limit, 100)
             messages = await client(GetHistoryRequest(
                 peer=entity,
                 offset_id=offset_id,
@@ -437,7 +437,6 @@ async def get_channel_messages(
                 break
 
             for message in messages.messages:
-                logging.debug(f"Message: {message}")
                 sender_username = None
                 if message.sender_id:
                     sender_entity = await client.get_entity(message.sender_id)
@@ -445,59 +444,65 @@ async def get_channel_messages(
 
                 message_data = {
                     "username": sender_username,
-                    "sender_id": utils.resolve_id(message.sender_id)[0],
+                    "sender_id": message.sender_id,
                     "text": message.message if message.message else "",
                     "date": message.date.isoformat(),
                     "media": None
                 }
 
-                try:
-                    file_stream = io.BytesIO()
-                    file_extension = ''
-                    remote_file_path = ''
+                if message.media:
+                    try:
+                        file_stream = io.BytesIO()
+                        file_name = ''
+                        file_extension = ''
+                        remote_file_path = ''
 
-                    if isinstance(message.media, MessageMediaPhoto):
-                        logging.debug(f"Photo detected: {message.media.photo}")
-                        await client.download_media(message.media.photo, file=file_stream)
-                        file_stream.seek(0)
-                        file_extension = 'jpg'  # Default extension for photos
-                        remote_file_path = f"/home/{sftp_username}/media/photos/{message.media.photo.id}.{file_extension}"
-                    
-                    elif isinstance(message.media, MessageMediaDocument):
-                        doc = message.media.document
-                        logging.debug(f"Document detected: {doc}")
-                        await client.download_media(doc, file=file_stream)
-                        file_stream.seek(0)
-                        mime_type = doc.mime_type
-                        file_extension = mimetypes.guess_extension(mime_type) or 'bin'
+                        if isinstance(message.media, MessageMediaPhoto):
+                            logging.debug(f"Downloading photo media from message ID: {message.id}")
+                            await client.download_media(message.media.photo, file=file_stream)
+                            file_extension = 'jpg'
+                            file_name = f"{message.media.photo.id}.{file_extension}"
+                            # Check if file name is available in attributes
+                            if hasattr(message.media.photo, 'attributes'):
+                                for attr in message.media.photo.attributes:
+                                    if hasattr(attr, 'file_name'):
+                                        file_name = attr.file_name
+                                        break
 
-                        if 'video' in mime_type:
-                            remote_file_path = f"/home/{sftp_username}/media/videos/{doc.id}{file_extension}"
-                        elif mime_type in ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
-                            remote_file_path = f"/home/{sftp_username}/media/docs/{doc.id}{file_extension}"
+                        elif isinstance(message.media, MessageMediaDocument):
+                            doc = message.media.document
+                            logging.debug(f"Downloading document media from message ID: {message.id}")
+                            await client.download_media(doc, file=file_stream)
+                            mime_type = doc.mime_type
+                            file_extension = mimetypes.guess_extension(mime_type) or 'bin'
+                            file_name = next((attr.file_name for attr in doc.attributes if hasattr(attr, 'file_name')), f"{doc.id}{file_extension}")
+
                         else:
-                            remote_file_path = f"/home/{sftp_username}/media/files/{doc.id}{file_extension}"
-                    
-                    else:
-                        logging.debug(f"Unknown media detected: {message.media}")
-                        await client.download_media(message.media, file=file_stream)
+                            logging.debug(f"Downloading other media from message ID: {message.id}")
+                            await client.download_media(message.media, file=file_stream)
+                            mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
+                            file_extension = mimetypes.guess_extension(mime_type) or 'bin'
+                            file_name = f"{message.media.id}.{file_extension}"
+
                         file_stream.seek(0)
-                        mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
-                        file_extension = mimetypes.guess_extension(mime_type) or 'bin'
-                        remote_file_path = f"/home/{sftp_username}/media/files/{message.media.id}{file_extension}"
+                        uploaded_file_url = upload_file_to_spaces(file_stream, file_name, channel_id, access_key, secret_key, endpoint, bucket, folder)
+                        
+                        logging.debug(f"Uploaded file URL: {uploaded_file_url}")
+                        
+                        if not uploaded_file_url:
+                            raise Exception("File upload returned an invalid URL.")
+                        
+                        message_data["media"] = {
+                            "type": "photo" if isinstance(message.media, MessageMediaPhoto) else "document",
+                            "path": uploaded_file_url
+                        }
 
-                    logging.debug(f"Uploading media to: {remote_file_path}")
-                    # Upload media to server
-                    await upload_file_to_server(file_stream, remote_file_path, server_ip, sftp_username, ssh_key_path, passphrase)
-                    message_data["media"] = {"type": "photo" if isinstance(message.media, MessageMediaPhoto) else "video" if 'video' in mime_type else "document", "path": remote_file_path}
-
-                except Exception as e:
-                    logging.error(f"Error downloading or uploading media: {e}")
-                    message_data["media"] = {"type": "error", "path": None}
+                    except Exception as e:
+                        logging.error(f"Error downloading or uploading media: {e}")
+                        message_data["media"] = {"type": "error", "path": None}
 
                 result.append(message_data)
 
-            # Update the offset_id and remaining limit
             offset_id = messages.messages[-1].id
             remaining_limit -= len(messages.messages)
 
