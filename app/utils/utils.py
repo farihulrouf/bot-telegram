@@ -1,10 +1,8 @@
-# app/utils/utils.py
-
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 import logging
 
-def upload_file_to_spaces(file_stream, file_name, channel_id, access_key, secret_key, endpoint, bucket, folder):
+def upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secret_key, endpoint, bucket, folder):
     try:
         session = boto3.session.Session()
         client = session.client('s3',
@@ -13,7 +11,7 @@ def upload_file_to_spaces(file_stream, file_name, channel_id, access_key, secret
                                 aws_access_key_id=access_key,
                                 aws_secret_access_key=secret_key)
 
-        path = f"{folder}/{channel_id}/{file_name}"
+        path = f"{folder}/{channel_name}/{file_name}"
 
         # Upload file with public-read ACL
         client.upload_fileobj(file_stream, bucket, path, ExtraArgs={'ACL': 'public-read'})

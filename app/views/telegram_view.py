@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
 from app.models.telegram_model import PhoneNumber,WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
-from app.controllers import telegram_controller
+from app.controllers import telegram_crowler ,telegram_controller
 from typing import Dict, List
 
 router = APIRouter()
@@ -37,7 +37,7 @@ async def get_message(
     limit: int = Query(10)  # Removed the maximum limit constraint
 ):
     try:
-        response = await telegram_controller.get_channel_messages(phone, channel_username, limit)
+        response = await telegram_crowler.get_channel_messages(phone, channel_username, limit)
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

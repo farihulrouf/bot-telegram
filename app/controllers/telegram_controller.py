@@ -16,6 +16,8 @@ import re
 import io
 import paramiko
 import mimetypes
+import time
+import sys
 
 from dotenv import load_dotenv
 
@@ -148,8 +150,6 @@ def extract_channel_names(text: str) -> ChannelNamesResponse:
         total_channel=len(channel_names),
         name_channel=channel_names
     )
-
-
 
 async def read_and_join_channels(phone: str, channel_username: str, limit: int = 10):
     client = sessions.get(phone)
@@ -391,124 +391,4 @@ async def upload_file_to_server(file_stream: io.BytesIO, remote_file_path: str, 
     except Exception as e:
         logging.error(f"Error uploading file: {e}")
 
-async def get_channel_messages(
-    phone: str, 
-    channel_username: str, 
-    limit: int = 10,
-    endpoint: str = os.getenv('SPACES_ENDPOINT'),
-    bucket: str = os.getenv('SPACES_BUCKET'),
-    folder: str = os.getenv('SPACES_FOLDER'),
-    access_key: str = os.getenv('SPACES_ACCESS_KEY'),
-    secret_key: str = os.getenv('SPACES_SECRET_KEY')
-):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-    logging.debug(f"Session found for phone: {phone}")
 
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        if channel_username.startswith('@'):
-            channel_username = channel_username[1:]
-
-        entity = await client.get_entity(channel_username)
-        channel_id = entity.id
-
-        result = []
-        offset_id = 0
-        remaining_limit = limit
-
-        while remaining_limit > 0:
-            batch_limit = min(remaining_limit, 100)
-            messages = await client(GetHistoryRequest(
-                peer=entity,
-                offset_id=offset_id,
-                offset_date=None,
-                add_offset=0,
-                limit=batch_limit,
-                max_id=0,
-                min_id=0,
-                hash=0
-            ))
-
-            if not messages.messages:
-                break
-
-            for message in messages.messages:
-                sender_username = None
-                if message.sender_id:
-                    sender_entity = await client.get_entity(message.sender_id)
-                    sender_username = sender_entity.username
-
-                message_data = {
-                    "username": sender_username,
-                    "sender_id": message.sender_id,
-                    "text": message.message if message.message else "",
-                    "date": message.date.isoformat(),
-                    "media": None
-                }
-
-                if message.media:
-                    try:
-                        file_stream = io.BytesIO()
-                        file_name = ''
-                        file_extension = ''
-                        remote_file_path = ''
-
-                        if isinstance(message.media, MessageMediaPhoto):
-                            logging.debug(f"Downloading photo media from message ID: {message.id}")
-                            await client.download_media(message.media.photo, file=file_stream)
-                            file_extension = 'jpg'
-                            file_name = f"{message.media.photo.id}.{file_extension}"
-                            # Check if file name is available in attributes
-                            if hasattr(message.media.photo, 'attributes'):
-                                for attr in message.media.photo.attributes:
-                                    if hasattr(attr, 'file_name'):
-                                        file_name = attr.file_name
-                                        break
-
-                        elif isinstance(message.media, MessageMediaDocument):
-                            doc = message.media.document
-                            logging.debug(f"Downloading document media from message ID: {message.id}")
-                            await client.download_media(doc, file=file_stream)
-                            mime_type = doc.mime_type
-                            file_extension = mimetypes.guess_extension(mime_type) or 'bin'
-                            file_name = next((attr.file_name for attr in doc.attributes if hasattr(attr, 'file_name')), f"{doc.id}{file_extension}")
-
-                        else:
-                            logging.debug(f"Downloading other media from message ID: {message.id}")
-                            await client.download_media(message.media, file=file_stream)
-                            mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
-                            file_extension = mimetypes.guess_extension(mime_type) or 'bin'
-                            file_name = f"{message.media.id}.{file_extension}"
-
-                        file_stream.seek(0)
-                        uploaded_file_url = upload_file_to_spaces(file_stream, file_name, channel_id, access_key, secret_key, endpoint, bucket, folder)
-                        
-                        logging.debug(f"Uploaded file URL: {uploaded_file_url}")
-                        
-                        if not uploaded_file_url:
-                            raise Exception("File upload returned an invalid URL.")
-                        
-                        message_data["media"] = {
-                            "type": "photo" if isinstance(message.media, MessageMediaPhoto) else "document",
-                            "path": uploaded_file_url
-                        }
-
-                    except Exception as e:
-                        logging.error(f"Error downloading or uploading media: {e}")
-                        message_data["media"] = {"type": "error", "path": None}
-
-                result.append(message_data)
-
-            offset_id = messages.messages[-1].id
-            remaining_limit -= len(messages.messages)
-
-        await client.disconnect()
-        return {"status": "messages_received", "messages": result}
-
-    except Exception as e:
-        await client.disconnect()
-        raise Exception(f"Failed to get messages: {str(e)}")
