@@ -9,8 +9,6 @@ from app.models.telegram_model import create_client, sessions, ChannelNamesRespo
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.utils.utils import upload_file_to_spaces
-
-
 # Set up logging
 logging.basicConfig(level=logging.DEBUG)
 
@@ -30,6 +28,9 @@ def progress_callback(transferred, total):
         print(f'Upload Progress: {percentage:.2f}%')
     else:
         print('Upload Progress: 0.00%')
+
+def sanitize_filename(filename):
+    return "".join([c if c.isalnum() or c in ['_', '.', '-'] else '_' for c in filename])
 
 async def get_channel_messages(
     phone: str,
@@ -104,7 +105,7 @@ async def get_channel_messages(
                             logging.debug(f"Downloading photo media from message ID: {message.id}")
                             await client.download_media(message.media.photo, file=file_stream, progress_callback=report_progress)
                             file_extension = 'jpg'
-                            file_name = f"photo_{message.media.photo.id}.{file_extension}"
+                            file_name = next((attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), f"photo_{message.id}.{file_extension}")
 
                         elif isinstance(message.media, MessageMediaDocument):
                             doc = message.media.document
@@ -121,6 +122,9 @@ async def get_channel_messages(
                             file_extension = mimetypes.guess_extension(mime_type) or 'bin'
                             file_name = f"{message.media.id}.{file_extension}"
 
+                        # Sanitize file name
+                        file_name = sanitize_filename(file_name)
+
                         file_stream.seek(0)
                         logging.debug(f"Uploading file with name: {file_name}")
                         uploaded_file_url = upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secret_key, endpoint, bucket, folder)
@@ -129,9 +133,23 @@ async def get_channel_messages(
                         
                         if not uploaded_file_url:
                             raise Exception("File upload returned an invalid URL.")
-                        
+
+                        mime_type = mimetypes.guess_type(file_name)[0]
+                        media_type = "document"
+                        if mime_type:
+                            if mime_type.startswith('image/'):
+                                media_type = "photo"
+                            elif mime_type.startswith('video/'):
+                                media_type = "video"
+                            elif mime_type.startswith('audio/'):
+                                media_type = "audio"
+                            elif mime_type in ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
+                                media_type = "document"
+                            else:
+                                media_type = "file"
+
                         message_data["media"] = {
-                            "type": "photo" if isinstance(message.media, MessageMediaPhoto) else "document",
+                            "type": media_type,
                             "path": uploaded_file_url
                         }
 
