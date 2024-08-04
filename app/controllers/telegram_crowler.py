@@ -72,6 +72,8 @@ async def ensure_joined(client, username):
     except Exception as e:
         print(f"Error joining {username}: {e}")
 
+
+
 async def get_channel_messages(
     phone: str,
     channel_username: str,
@@ -118,8 +120,10 @@ async def get_channel_messages(
                 hash=0
             ))
 
+            # Log number of messages received
+            logging.debug(f"Number of messages received: {len(messages.messages)}")
+
             if not messages.messages:
-                logging.debug("No more messages to retrieve.")
                 break
 
             for message in messages.messages:
@@ -145,6 +149,10 @@ async def get_channel_messages(
                         file_stream = io.BytesIO()
                         file_name = ''
                         file_extension = ''
+                        remote_file_path = ''
+
+                        global start_time
+                        start_time = time.time()
 
                         if isinstance(message.media, MessageMediaPhoto):
                             logging.debug(f"Downloading photo media from message ID: {message.id}")
@@ -205,8 +213,7 @@ async def get_channel_messages(
                 result.append(message_data)
                 total_messages_read += 1
 
-            offset_id = messages.messages[-1].id
-            logging.debug(f"Processed {total_messages_read} messages. Last message ID: {offset_id}")
+            offset_id = messages.messages[-1].id  # Update offset_id to the last message ID
 
             # Break the loop if limit has been reached
             if remaining_limit is not None:
@@ -215,11 +222,7 @@ async def get_channel_messages(
                     break
 
         await client.disconnect()
-        return {
-            "status": "messages_received",
-            "total_messages_read": total_messages_read,
-            "messages": result
-        }
+        return {"status": "messages_received", "total_messages_read": total_messages_read, "messages": result}
 
     except Exception as e:
         await client.disconnect()
