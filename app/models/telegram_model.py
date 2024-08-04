@@ -20,6 +20,15 @@ webhook_url = 'http://localhost:8000/api/webhook'
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
 
+class FileDetails(BaseModel):
+    name: str
+    size: int
+
+class ListDataResponse(BaseModel):
+    status: str
+    total_files: int
+    files: List[FileDetails]
+
 class WebhookPayload(BaseModel):
     sender_id: int
     chat_id: int

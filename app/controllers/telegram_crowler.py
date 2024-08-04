@@ -4,7 +4,6 @@ import time
 import logging
 import mimetypes
 import sys
-import re
 from telethon import TelegramClient
 from app.models.telegram_model import create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
@@ -12,6 +11,9 @@ from telethon.tl.functions.channels import JoinChannelRequest
 from telethon.tl.types import PeerChannel
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.utils.utils import upload_file_to_spaces
+import re
+from typing import Optional
+
 # Set up logging
 #logging.basicConfig(level=logging.DEBUG)
 
@@ -73,7 +75,7 @@ async def ensure_joined(client, username):
 async def get_channel_messages(
     phone: str,
     channel_username: str,
-    limit: int = None,  # Default to None if not provided
+    limit: Optional[int] = None,  # Default to None if not provided
     endpoint: str = os.getenv('SPACES_ENDPOINT'),
     bucket: str = os.getenv('SPACES_BUCKET'),
     folder: str = os.getenv('SPACES_FOLDER'),
@@ -100,6 +102,7 @@ async def get_channel_messages(
 
         # Initialize remaining_limit with the provided limit or None
         remaining_limit = limit
+        total_messages_read = 0
 
         while True:
             # Set batch_limit to 100 or the remaining_limit if it is specified
@@ -116,6 +119,7 @@ async def get_channel_messages(
             ))
 
             if not messages.messages:
+                logging.debug("No more messages to retrieve.")
                 break
 
             for message in messages.messages:
@@ -141,10 +145,6 @@ async def get_channel_messages(
                         file_stream = io.BytesIO()
                         file_name = ''
                         file_extension = ''
-                        remote_file_path = ''
-
-                        global start_time
-                        start_time = time.time()
 
                         if isinstance(message.media, MessageMediaPhoto):
                             logging.debug(f"Downloading photo media from message ID: {message.id}")
@@ -203,8 +203,10 @@ async def get_channel_messages(
                         message_data["media"] = {"type": "error", "path": None}
 
                 result.append(message_data)
+                total_messages_read += 1
 
             offset_id = messages.messages[-1].id
+            logging.debug(f"Processed {total_messages_read} messages. Last message ID: {offset_id}")
 
             # Break the loop if limit has been reached
             if remaining_limit is not None:
@@ -213,7 +215,11 @@ async def get_channel_messages(
                     break
 
         await client.disconnect()
-        return {"status": "messages_received", "messages": result}
+        return {
+            "status": "messages_received",
+            "total_messages_read": total_messages_read,
+            "messages": result
+        }
 
     except Exception as e:
         await client.disconnect()

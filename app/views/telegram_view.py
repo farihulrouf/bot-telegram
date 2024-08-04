@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from app.models.telegram_model import PhoneNumber,WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
-from app.controllers import telegram_crowler ,telegram_controller
+from app.models.telegram_model import FileDetails, ListDataResponse, PhoneNumber,WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
+from app.controllers import telegram_crowler ,telegram_controller, spaces_controller
 from typing import Dict, List
+import os
 
 router = APIRouter()
 
@@ -126,3 +127,21 @@ async def receive_webhook(payload: WebhookPayload):
 
     # Contoh: Kirim respons untuk mengonfirmasi bahwa webhook diterima
     return {"status": "success"}
+
+
+
+
+@router.get("/api/listdata", response_model=ListDataResponse)
+async def list_data(name_folder: str):
+    try:
+        result = spaces_controller.list_objects_in_folder(
+            bucket=os.getenv('SPACES_BUCKET'),
+            folder=os.path.join(os.getenv('SPACES_FOLDER'), name_folder)
+        )
+        if result['status'] == 'error':
+            raise HTTPException(status_code=500, detail=result['detail'])
+        return result
+    except Exception as e:
+        import traceback
+        error_message = traceback.format_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to list data: {error_message}")
