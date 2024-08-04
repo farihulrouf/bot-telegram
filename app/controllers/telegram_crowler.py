@@ -4,38 +4,76 @@ import time
 import logging
 import mimetypes
 import sys
+import re
 from telethon import TelegramClient
 from app.models.telegram_model import create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.types import PeerChannel
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.utils.utils import upload_file_to_spaces
 # Set up logging
-logging.basicConfig(level=logging.DEBUG)
+#logging.basicConfig(level=logging.DEBUG)
 
 # Function to display download progress
 def report_progress(transferred, total):
     if total > 0:
         percentage = (transferred / total) * 100
         speed = transferred / (time.time() - start_time)
-        print(f'Download Progress: {percentage:.2f}% | Speed: {speed / 1024:.2f} KB/s')
+        bar_length = 40  # Length of the progress bar
+        filled_length = int(bar_length * transferred // total)
+        bar = '#' * filled_length + '-' * (bar_length - filled_length)
+        sys.stdout.write(f'\rDownload Progress: |{bar}| {percentage:.2f}% | Speed: {speed / 1024:.2f} KB/s')
+        sys.stdout.flush()
     else:
-        print('Download Progress: 0.00% | Speed: 0.00 KB/s')
+        sys.stdout.write('\rDownload Progress: |' + '-' * 40 + '| 0.00% | Speed: 0.00 KB/s')
+        sys.stdout.flush()
 
 # Function to display upload progress
 def progress_callback(transferred, total):
     if total > 0:
         percentage = (transferred / total) * 100
-        print(f'Upload Progress: {percentage:.2f}%')
+        bar_length = 40  # Length of the progress bar
+        filled_length = int(bar_length * transferred // total)
+        bar = '#' * filled_length + '-' * (bar_length - filled_length)
+        sys.stdout.write(f'\rUpload Progress: |{bar}| {percentage:.2f}%')
+        sys.stdout.flush()
     else:
-        print('Upload Progress: 0.00%')
+        sys.stdout.write('\rUpload Progress: |' + '-' * 40 + '| 0.00%')
+        sys.stdout.flush()
+
+# Ensure to call this function before starting the download/upload to initialize `start_time`
+start_time = time.time()
 
 def sanitize_filename(filename):
     return "".join([c if c.isalnum() or c in ['_', '.', '-'] else '_' for c in filename])
 
+async def extract_and_join_channels(client, message_text):
+    channel_mentions = re.findall(r'@(\w+)', message_text)
+    if channel_mentions:
+        print("Detected Telegram channels:")
+        for mention in channel_mentions:
+            print(f"Joining channel: {mention}")
+            await ensure_joined(client, mention)
+    else:
+        print("No Telegram channels found in message.")
+
+async def ensure_joined(client, username):
+    try:
+        entity = await client.get_entity(username)
+        if isinstance(entity, PeerChannel):
+            print(f"Already a member of {username}.")
+        else:
+            print(f"Joining {username}...")
+            await client(JoinChannelRequest(username))
+            print(f"Successfully joined {username}.")
+    except Exception as e:
+        print(f"Error joining {username}: {e}")
+
 async def get_channel_messages(
     phone: str,
     channel_username: str,
-    limit: int = 10,
+    limit: int = None,  # Default to None if not provided
     endpoint: str = os.getenv('SPACES_ENDPOINT'),
     bucket: str = os.getenv('SPACES_BUCKET'),
     folder: str = os.getenv('SPACES_FOLDER'),
@@ -59,10 +97,13 @@ async def get_channel_messages(
 
         result = []
         offset_id = 0
+
+        # Initialize remaining_limit with the provided limit or None
         remaining_limit = limit
 
-        while remaining_limit > 0:
-            batch_limit = min(remaining_limit, 100)
+        while True:
+            # Set batch_limit to 100 or the remaining_limit if it is specified
+            batch_limit = 100 if remaining_limit is None else min(100, remaining_limit)
             messages = await client(GetHistoryRequest(
                 peer=entity,
                 offset_id=offset_id,
@@ -78,6 +119,10 @@ async def get_channel_messages(
                 break
 
             for message in messages.messages:
+                # Extract channels from message and join
+                if message.message:
+                    await extract_and_join_channels(client, message.message)
+
                 sender_username = None
                 if message.sender_id:
                     sender_entity = await client.get_entity(message.sender_id)
@@ -160,7 +205,12 @@ async def get_channel_messages(
                 result.append(message_data)
 
             offset_id = messages.messages[-1].id
-            remaining_limit -= len(messages.messages)
+
+            # Break the loop if limit has been reached
+            if remaining_limit is not None:
+                remaining_limit -= len(messages.messages)
+                if remaining_limit <= 0:
+                    break
 
         await client.disconnect()
         return {"status": "messages_received", "messages": result}
