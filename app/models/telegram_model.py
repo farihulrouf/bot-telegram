@@ -1,6 +1,6 @@
 from telethon import TelegramClient, events
 from telethon.errors import SessionPasswordNeededError
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, Channel, Chat
 from pydantic import BaseModel
 from typing import Optional
 import os
@@ -43,6 +43,10 @@ class ContactResponse(BaseModel):
     phone: Optional[str]
     username: Optional[str]
 
+class ChannelGroup(BaseModel):
+    name_channel_group: str
+    status: bool
+
 class ChannelDetailResponse(BaseModel):
     id: int
     name: str
@@ -55,7 +59,8 @@ class ChannelDetailResponse(BaseModel):
 
 class ChannelNamesResponseAll(BaseModel):
     total_channels: int
-    channels: List[Dict[str, str]]
+    total_groups: int
+    channels_groups: List[ChannelGroup]
     
 class SendMessageRequest(BaseModel):
     phone: str

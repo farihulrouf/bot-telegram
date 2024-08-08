@@ -1,6 +1,9 @@
 import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 import logging
+from telethon.tl.functions.channels import JoinChannelRequest
+from telethon.tl.types import PeerChannel
+import re
 
 def sanitize_filename(filename):
     return "".join([c if c.isalnum() or c in ['_', '.', '-'] else '_' for c in filename])
@@ -33,3 +36,27 @@ def upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secr
     except Exception as e:
         logging.error(f"Failed to upload file to DigitalOcean Spaces: {e}")
         raise Exception(f"Failed to upload file to DigitalOcean Spaces: {e}")
+
+
+
+async def extract_and_join_channels(client, message_text):
+    channel_mentions = re.findall(r'@(\w+)', message_text)
+    if channel_mentions:
+        print("Detected Telegram channels:")
+        for mention in channel_mentions:
+            print(f"Joining channel: {mention}")
+            await ensure_joined(client, mention)
+    else:
+        print("No Telegram channels found in message.")
+
+async def ensure_joined(client, username):
+    try:
+        entity = await client.get_entity(username)
+        if isinstance(entity, PeerChannel):
+            print(f"Already a member of {username}.")
+        else:
+            print(f"Joining {username}...")
+            await client(JoinChannelRequest(username))
+            print(f"Successfully joined {username}.")
+    except Exception as e:
+        print(f"Error joining {username}: {e}")

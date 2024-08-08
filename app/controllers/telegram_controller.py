@@ -6,9 +6,11 @@ from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
+from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
 from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest, GetParticipantsRequest
 from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
+from telethon.errors.rpcerrorlist import ChannelsTooMuchError
+
 import asyncio
 import base64
 import os
@@ -233,41 +235,6 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
     finally:
         await client.disconnect()
 
-async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
-    client = sessions.get(phone)
-    if not client:
-        logging.error(f"Session not found for phone: {phone}")
-        raise Exception("Session not found")
-    logging.debug(f"Session found for phone: {phone}")
-
-    if not client.is_connected():
-        logging.debug(f"Connecting client for phone: {phone}")
-        await client.connect()
-
-    try:
-        dialogs = await client.get_dialogs()
-        logging.debug(f"Retrieved dialogs for phone: {phone}")
-
-        channels = [
-            {'name_channel': f"@{dialog.entity.username}"}
-            for dialog in dialogs
-            if dialog.is_channel and dialog.entity.username
-        ]
-        logging.debug(f"Extracted channel names for phone: {phone}")
-
-        await client.disconnect()
-        logging.debug(f"Client disconnected for phone: {phone}")
-
-        response = ChannelNamesResponseAll(
-            total_channels=len(channels),
-            channels=channels
-        )
-        
-        return response
-    except Exception as e:
-        logging.error(f"Failed to get channels: {str(e)}")
-        await client.disconnect()
-        raise Exception(f"Failed to get channels: {str(e)}")
     
 async def get_channel_details(phone: str, channel_username: str):
     client = sessions.get(phone)
@@ -391,4 +358,51 @@ async def upload_file_to_server(file_stream: io.BytesIO, remote_file_path: str, 
     except Exception as e:
         logging.error(f"Error uploading file: {e}")
 
+async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
+    client = sessions.get(phone)
+    if not client:
+        logging.error(f"Session not found for phone: {phone}")
+        raise HTTPException(status_code=404, detail="Session not found")
+    logging.debug(f"Session found for phone: {phone}")
 
+    if not client.is_connected():
+        logging.debug(f"Connecting client for phone: {phone}")
+        await client.connect()
+
+    try:
+        dialogs = await client.get_dialogs()
+        logging.debug(f"Retrieved dialogs for phone: {phone}")
+
+        channels = []
+        groups = []
+
+        for dialog in dialogs:
+            entity = dialog.entity
+            if isinstance(entity, Channel):
+                name = f"@{entity.username}" if entity.username else f"@{entity.title}"
+                channels.append({'name_channel_group': name, 'status': True})
+            elif isinstance(entity, Chat):
+                name = f"@{entity.title}"
+                groups.append({'name_channel_group': name, 'status': False})
+
+        logging.debug(f"Extracted channel and group names for phone: {phone}")
+
+        response = ChannelNamesResponseAll(
+            total_channels=len(channels),
+            total_groups=len(groups),
+            channels_groups=channels + groups
+        )
+
+        await client.disconnect()
+        logging.debug(f"Client disconnected for phone: {phone}")
+
+        return response
+
+    except ChannelsTooMuchError as e:
+        logging.error(f"Failed to get channels: {str(e)}")
+        await client.disconnect()
+        raise HTTPException(status_code=500, detail=f"Failed to get channels: {str(e)}")
+    except Exception as e:
+        logging.error(f"Failed to get channels and groups: {str(e)}")
+        await client.disconnect()
+        raise HTTPException(status_code=500, detail=f"Failed to get channels and groups: {str(e)}")

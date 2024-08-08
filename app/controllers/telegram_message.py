@@ -3,9 +3,10 @@ from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from app.models.telegram_model import sessions
 from typing import List, Dict, Any, Optional
 from fastapi import HTTPException
-from app.utils.utils import sanitize_filename
+from app.utils.utils import sanitize_filename, extract_and_join_channels
+import re
 
-async def read_all_messages(phone: str, channel_username: str, limit: Optional[int] = None) -> Dict[str, Any]:
+async def read_all_messages(phone: str, channel_identifier: str, limit: Optional[int] = None) -> Dict[str, Any]:
     client = sessions.get(phone)
     if not client:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -14,11 +15,22 @@ async def read_all_messages(phone: str, channel_username: str, limit: Optional[i
         await client.connect()
 
     try:
-        if channel_username.startswith('@'):
-            channel_username = channel_username[1:]
+        # Check if identifier is an ID or username
+        try:
+            # Try to get entity by ID
+            entity_id = int(channel_identifier)
+            entity = await client.get_entity(entity_id)
+        except ValueError:
+            # Not an integer, so assume it's a username
+            if channel_identifier.startswith('@'):
+                channel_identifier = channel_identifier[1:]
+            entity = await client.get_entity(channel_identifier)
 
-        entity = await client.get_entity(channel_username)
-        channel_name = entity.username or str(entity.id)
+        # Fallback if username is not available
+        if not entity.username:
+            channel_name = str(entity.id)
+        else:
+            channel_name = entity.username
 
         all_messages = []
         offset_id = 0
@@ -75,8 +87,12 @@ async def read_all_messages(phone: str, channel_username: str, limit: Optional[i
                         "path": media_path
                     }
 
+                # Detect mentions of channels in message text
+                #if message.message:
+                #    await extract_and_join_channels(client, message.message)
+
                 all_messages.append({
-                    "username": channel_username,
+                    "username": channel_name,
                     "sender_id": message.sender_id,
                     "text": message.message,
                     "date": message.date.isoformat(),
