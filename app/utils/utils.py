@@ -2,6 +2,9 @@ import boto3
 from botocore.exceptions import NoCredentialsError, PartialCredentialsError
 import logging
 
+def sanitize_filename(filename):
+    return "".join([c if c.isalnum() or c in ['_', '.', '-'] else '_' for c in filename])
+
 def upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secret_key, endpoint, bucket, folder):
     try:
         session = boto3.session.Session()

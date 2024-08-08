@@ -177,7 +177,7 @@ async def get_channel_messages(
 
                         # Sanitize file name
                         file_name = sanitize_filename(file_name)
-
+                       
                         file_stream.seek(0)
                         logging.debug(f"Uploading file with name: {file_name}")
                         uploaded_file_url = upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secret_key, endpoint, bucket, folder)
