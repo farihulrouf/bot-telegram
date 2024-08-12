@@ -1,10 +1,15 @@
-from telethon.tl.functions.messages import GetHistoryRequest
-from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
-from app.models.telegram_model import sessions
-from typing import List, Dict, Any, Optional
-from fastapi import HTTPException
-from app.utils.utils import sanitize_filename, extract_and_join_channels
 import re
+import logging
+from typing import List, Dict, Any, Optional
+from telethon.tl.functions.messages import GetHistoryRequest, ImportChatInviteRequest
+from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
+from telethon.errors import FloodWaitError, ChatAdminRequiredError
+from fastapi import HTTPException
+from app.models.telegram_model import sessions
+from app.utils.utils import sanitize_filename
+
+# Regex for detecting URLs
+URL_REGEX = re.compile(r'(https?://[^\s]+)')
 
 async def read_all_messages(phone: str, channel_identifier: str, limit: Optional[int] = None) -> Dict[str, Any]:
     client = sessions.get(phone)
@@ -15,26 +20,26 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
         await client.connect()
 
     try:
-        # Check if identifier is an ID or username
+        # Determine if identifier is an ID or username
         try:
             # Try to get entity by ID
             entity_id = int(channel_identifier)
             entity = await client.get_entity(entity_id)
         except ValueError:
-            # Not an integer, so assume it's a username
+            # Not an integer, assume it's a username
             if channel_identifier.startswith('@'):
                 channel_identifier = channel_identifier[1:]
             entity = await client.get_entity(channel_identifier)
 
-        # Fallback if username is not available
-        if not entity.username:
-            channel_name = str(entity.id)
-        else:
-            channel_name = entity.username
+        # Determine if the entity is a channel or group
+        if entity.broadcast:  # This checks if it's a channel
+            channel_name = entity.username if entity.username else str(entity.id)
+        else:  # Assume it's a group
+            channel_name = entity.title if entity.title else "Group Description"
 
         all_messages = []
         offset_id = 0
-        remaining_limit = limit if limit is not None else float('inf')  # Use infinity if limit is None
+        remaining_limit = limit if limit is not None else float('inf')  # Use infinity if no limit
 
         while remaining_limit > 0:
             batch_limit = min(remaining_limit, 100)
@@ -57,39 +62,13 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
 
                 # Handle media
                 if message.media:
-                    media_type = "unknown"
-                    media_path = None
+                    media_info = await handle_media(message, channel_name)
 
-                    if isinstance(message.media, MessageMediaPhoto):
-                        media_type = "photo"
-                        file_extension = 'jpg'  # Assume jpg for photos
-                        file_name = next(
-                            (attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), 
-                            f"photo_{message.id}.{file_extension}"
-                        )
-                        file_name = sanitize_filename(file_name)  # Clean the file name
-                        media_path = get_file_url(message.media.photo.id, channel_name, file_name)
-                    elif isinstance(message.media, MessageMediaDocument):
-                        media_type = "file"  # For files like docs
-                        file = message.media.document
-                        # Safely handle file_name
-                        file_name = 'unknown_file'
-                        if hasattr(file, 'attributes') and file.attributes:
-                            for attr in file.attributes:
-                                if hasattr(attr, 'file_name'):
-                                    file_name = attr.file_name
-                                    break
-                        file_name = sanitize_filename(file_name)  # Clean the file name
-                        media_path = get_file_url(file.id, channel_name, file_name)
-                    
-                    media_info = {
-                        "type": media_type,
-                        "path": media_path
-                    }
-
-                # Detect mentions of channels in message text
-                #if message.message:
-                #    await extract_and_join_channels(client, message.message)
+                # Detect and process URLs in message text
+                urls = URL_REGEX.findall(message.message or "")
+                for url in urls:
+                    if "t.me/joinchat/" in url:
+                        await process_invite_url(url, client)
 
                 all_messages.append({
                     "username": channel_name,
@@ -109,16 +88,51 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
         }
 
     except Exception as e:
+        logging.error(f"Failed to read messages: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to read messages: {str(e)}")
     finally:
         await client.disconnect()
 
-def get_file_url(file_id: str, channel_username: str, file_name: Optional[str] = None) -> str:
-    # Construct file path
-    if file_name:
-        file_path = f"dragonfly/telegram/{channel_username}/{file_name}"
-    else:
-        file_path = f"dragonfly/telegram/{channel_username}/{file_id}"
+async def handle_media(message, channel_name):
+    media_info = {
+        "type": "unknown",
+        "path": None
+    }
+
+    if isinstance(message.media, MessageMediaPhoto):
+        media_info["type"] = "photo"
+        file_extension = 'jpg'
+        file_name = next(
+            (attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), 
+            f"photo_{message.id}.{file_extension}"
+        )
+        file_name = sanitize_filename(file_name)
+        media_info["path"] = get_file_url(message.media.photo.id, channel_name, file_name)
     
-    # Construct URL
+    elif isinstance(message.media, MessageMediaDocument):
+        media_info["type"] = "file"
+        file = message.media.document
+        file_name = 'unknown_file'
+        if hasattr(file, 'attributes') and file.attributes:
+            for attr in file.attributes:
+                if hasattr(attr, 'file_name'):
+                    file_name = attr.file_name
+                    break
+        file_name = sanitize_filename(file_name)
+        media_info["path"] = get_file_url(file.id, channel_name, file_name)
+    
+    return media_info
+
+async def process_invite_url(url, client):
+    try:
+        invite_code = url.split('t.me/joinchat/')[-1]
+        await client(ImportChatInviteRequest(invite_code))
+        logging.info(f"Joined group via URL: {url}")
+    except (FloodWaitError, ChatAdminRequiredError) as e:
+        logging.error(f"Failed to join group via URL: {url}, Error: {str(e)}")
+    except Exception as e:
+        logging.error(f"Error processing URL: {url}, Error: {str(e)}")
+
+def get_file_url(file_id: str, channel_username: str, file_name: Optional[str] = None) -> str:
+    file_path = f"dragonfly/telegram/{channel_username}/{file_name or file_id}"
     return f"https://dragonfly.sgp1.digitaloceanspaces.com/{file_path}"
