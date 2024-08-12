@@ -10,7 +10,7 @@ from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocu
 from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest, GetParticipantsRequest
 from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
-
+from fastapi.encoders import jsonable_encoder
 import asyncio
 import base64
 import os
@@ -74,24 +74,46 @@ async def verify(code: VerificationCode):
 
     try:
         await client.sign_in(code.phone, code.code)
+
         if client.is_user_authorized():
             me = await client.get_me()
+            me_dict = me.to_dict()
+            me_dict = process_bytes_in_dict(me_dict)  # Process bytes if any
             logging.debug(f"User logged in: {me}")
-            return {"status": "logged_in", "user": me.to_dict()}
+            return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
+
+        elif code.password:
+            await client.sign_in(password=code.password)
+            me = await client.get_me()
+            me_dict = me.to_dict()
+            me_dict = process_bytes_in_dict(me_dict)  # Process bytes if any
+            logging.debug(f"User logged in with 2FA: {me}")
+            return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
+
         else:
-            if code.password:
-                await client.sign_in(password=code.password)
-                me = await client.get_me()
-                logging.debug(f"User logged in with 2FA: {me}")
-                return {"status": "logged_in", "user": me.to_dict()}
-            else:
-                raise Exception("2FA required")
+            raise Exception("2FA required but no password provided")
+
     except SessionPasswordNeededError:
+        logging.debug("2FA is required for this account")
         return {"status": "2fa_required"}
+
     except Exception as e:
-        await client.disconnect()
+        logging.error(f"Failed to verify code: {str(e)}")
         raise Exception(f"Failed to verify code: {str(e)}")
-    
+
+    finally:
+        await client.disconnect()
+
+def process_bytes_in_dict(data):
+    for key, value in data.items():
+        if isinstance(value, bytes):
+            data[key] = value.decode('utf-8', errors='replace')
+        elif isinstance(value, dict):
+            data[key] = process_bytes_in_dict(value)
+        elif isinstance(value, list):
+            data[key] = [process_bytes_in_dict(v) if isinstance(v, dict) else v for v in value]
+    return data
+
 async def join_channel(channel_username, phone_number, client):
     try:
         await client.start(phone_number)
