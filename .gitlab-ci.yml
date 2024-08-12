@@ -7,12 +7,13 @@ variables:
   PYTHONPATH: "/usr/local/lib/python3.9/site-packages"
 
 before_script:
+  - python -m pip install --upgrade pip
   - pip install -r requirements.txt
 
 deploy_production:
   stage: deploy
   script:
-    - pip install paramiko
-    - python deploy_script.py
+    - pip install ansible
+    - ansible-playbook -i inventory/production deploy.yml
   only:
     - main
