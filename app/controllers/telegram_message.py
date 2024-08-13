@@ -53,7 +53,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                 min_id=0,
                 hash=0
             ))
-
+            
             if not messages.messages:
                 break
 
@@ -69,14 +69,32 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                 for url in urls:
                     if "t.me/joinchat/" in url:
                         await process_invite_url(url, client)
-
+                print("chek", message)
+                # Misalkan `message` adalah objek pesan yang memiliki atribut `reactions`
                 all_messages.append({
                     "username": channel_name,
                     "sender_id": message.sender_id,
                     "text": message.message,
                     "date": message.date.isoformat(),
-                    "media": media_info
+                    "media": media_info,
+                    "views": message.views,
+                    "forwards": message.forwards,
+                    "edit_date": message.edit_date,
+                    "reactions": {
+                        "results": [
+                            {
+                                "reaction": reaction.reaction.emoticon,  # Menyimpan emotikon sebagai string
+                                "count": reaction.count
+                            }
+                            for reaction in message.reactions.results
+                        ],
+                        "min": message.reactions.min,
+                        "can_see_list": message.reactions.can_see_list,
+                        "reactions_as_tags": message.reactions.reactions_as_tags,
+                        "recent_reactions": message.reactions.recent_reactions
+                    }
                 })
+
 
             offset_id = messages.messages[-1].id
             remaining_limit -= len(messages.messages)
