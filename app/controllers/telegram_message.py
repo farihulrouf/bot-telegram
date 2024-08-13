@@ -69,18 +69,11 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                 for url in urls:
                     if "t.me/joinchat/" in url:
                         await process_invite_url(url, client)
-                print("chek", message)
-                # Misalkan `message` adalah objek pesan yang memiliki atribut `reactions`
-                all_messages.append({
-                    "username": channel_name,
-                    "sender_id": message.sender_id,
-                    "text": message.message,
-                    "date": message.date.isoformat(),
-                    "media": media_info,
-                    "views": message.views,
-                    "forwards": message.forwards,
-                    "edit_date": message.edit_date,
-                    "reactions": {
+                
+                # Handle reactions
+                reactions_info = None
+                if message.reactions:
+                    reactions_info = {
                         "results": [
                             {
                                 "reaction": reaction.reaction.emoticon,  # Menyimpan emotikon sebagai string
@@ -93,8 +86,20 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                         "reactions_as_tags": message.reactions.reactions_as_tags,
                         "recent_reactions": message.reactions.recent_reactions
                     }
-                })
+                else:
+                    reactions_info = None  # Explicitly set to None if reactions are not present
 
+                all_messages.append({
+                    "username": channel_name,
+                    "sender_id": message.sender_id,
+                    "text": message.message,
+                    "date": message.date.isoformat(),
+                    "media": media_info,
+                    "views": message.views,
+                    "forwards": message.forwards,
+                    "edit_date": message.edit_date,
+                    "reactions": reactions_info
+                })
 
             offset_id = messages.messages[-1].id
             remaining_limit -= len(messages.messages)
