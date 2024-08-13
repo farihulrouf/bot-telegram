@@ -1,7 +1,7 @@
 import logging
 from telethon.errors import SessionPasswordNeededError , FloodWaitError, InviteHashExpiredError, InviteHashInvalidError
 from telethon import TelegramClient, events, utils, errors
-from telethon.tl.types import PeerChannel, UserProfilePhoto, ChannelFull, InputPhoneContact, InputUser, ChannelParticipantsSearch
+from telethon.tl.types import PeerChannel, ChatPhoto, UserProfilePhoto, ChannelFull, InputPhoneContact, InputUser, ChannelParticipantsSearch
 from telethon.tl.functions.contacts import GetContactsRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
@@ -257,8 +257,8 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
     finally:
         await client.disconnect()
 
-    
-async def get_channel_details(phone: str, channel_username: str):
+
+async def get_channel_details(phone: str, channel_identifier: str):
     client = sessions.get(phone)
     if not client:
         raise Exception("Session not found")
@@ -267,27 +267,58 @@ async def get_channel_details(phone: str, channel_username: str):
         await client.connect()
 
     try:
-        if channel_username.startswith('@'):
-            channel_username = channel_username[1:]
+        entity = None
 
-        entity = await client.get_entity(channel_username)
-        full_channel = await client(GetFullChannelRequest(channel=entity))
+        # Determine if the identifier is an ID or username
+        if channel_identifier.startswith('-') and channel_identifier[1:].isdigit():
+            # Treat as a negative ID
+            try:
+                entity_id = int(channel_identifier)
+                entity = await client.get_entity(entity_id)
+            except Exception as e:
+                await client.disconnect()
+                raise Exception(f"Failed to fetch by ID: {str(e)}")
+        elif channel_identifier.isdigit():
+            # Treat as a positive ID
+            try:
+                entity_id = int(channel_identifier)
+                entity = await client.get_entity(entity_id)
+            except Exception as e:
+                await client.disconnect()
+                raise Exception(f"Failed to fetch by ID: {str(e)}")
+        else:
+            # Treat as a username
+            if channel_identifier.startswith('@'):
+                channel_identifier = channel_identifier[1:]
+            try:
+                entity = await client.get_entity(channel_identifier)
+            except Exception as e:
+                await client.disconnect()
+                raise Exception(f"Failed to fetch by username: {str(e)}")
 
-        # Handle None values by providing a default value
-        channel_info = {
-            "id": entity.id,
-            "name": entity.title,
-            "username": entity.username,
-            "participants_count": full_channel.full_chat.participants_count or 0,
-            "admins_count": full_channel.full_chat.admins_count or 0,
-            "banned_count": full_channel.full_chat.kicked_count or 0,
-            "description": full_channel.full_chat.about or "",
-            "created_at": entity.date.isoformat()
-        }
+        # Ensure that the entity is a valid Channel or Chat
+        if isinstance(entity, (Channel, Chat)):
+            full_channel = await client(GetFullChannelRequest(channel=entity))
+            print("check",full_channel )
+            # Handle None values by providing default values
+            channel_info = {
+                "id": entity.id,
+                "name": entity.title or "No Title",
+                "username": entity.username or "No Username",
+                "participants_count": full_channel.full_chat.participants_count or 0,
+                "admins_count": full_channel.full_chat.admins_count or 0,
+                "banned_count": full_channel.full_chat.kicked_count or 0,
+                "description": full_channel.full_chat.about or "",
+                "created_at": entity.date.isoformat() if entity.date else "Unknown"
+            }
 
-        await client.disconnect()
-        return {"status": "success", "channel_info": channel_info}
+            await client.disconnect()
+            return {"status": "success", "channel_info": channel_info}
 
+        else:
+            await client.disconnect()
+            raise Exception("The identifier does not correspond to a channel or group.")
+    
     except Exception as e:
         await client.disconnect()
         raise Exception(f"Failed to get channel details: {str(e)}")
