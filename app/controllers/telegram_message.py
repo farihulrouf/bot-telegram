@@ -7,6 +7,7 @@ from telethon.errors import FloodWaitError, ChatAdminRequiredError
 from fastapi import HTTPException
 from app.models.telegram_model import sessions
 from app.utils.utils import sanitize_filename
+from app.utils.encode_emoji import encode_emoji_to_base64
 
 # Regex for detecting URLs
 URL_REGEX = re.compile(r'(https?://[^\s]+)')
@@ -76,7 +77,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                     reactions_info = {
                         "results": [
                             {
-                                "reaction": reaction.reaction.emoticon,  # Menyimpan emotikon sebagai string
+                                "reaction": encode_emoji_to_base64(reaction.reaction.emoticon),
                                 "count": reaction.count
                             }
                             for reaction in message.reactions.results
