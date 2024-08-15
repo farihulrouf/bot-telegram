@@ -7,7 +7,7 @@ from telethon.errors import FloodWaitError, ChatAdminRequiredError
 from fastapi import HTTPException
 from app.models.telegram_model import sessions
 from app.utils.utils import sanitize_filename
-from app.utils.encode_emoji import encode_emoji_to_base64
+from app.utils.encode_emoji import translate_emoticons_to_text
 
 # Regex for detecting URLs
 URL_REGEX = re.compile(r'(https?://[^\s]+)')
@@ -26,6 +26,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
             # Try to get entity by ID
             entity_id = int(channel_identifier)
             entity = await client.get_entity(entity_id)
+            print("cek", entity)
         except ValueError:
             # Not an integer, assume it's a username
             if channel_identifier.startswith('@'):
@@ -37,7 +38,9 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
             channel_name = entity.username if entity.username else str(entity.id)
         else:  # Assume it's a group
             channel_name = entity.title if entity.title else "Group Description"
-
+        
+        #id_entity =  channel_identifier
+        #print("cek", id_entity)
         all_messages = []
         offset_id = 0
         remaining_limit = limit if limit is not None else float('inf')  # Use infinity if no limit
@@ -60,7 +63,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
 
             for message in messages.messages:
                 media_info = None
-
+                print("cek data", message)
                 # Handle media
                 if message.media:
                     media_info = await handle_media(message, channel_name)
@@ -74,14 +77,20 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                 # Handle reactions
                 reactions_info = None
                 if message.reactions:
+                     # Translate emoticons to text
+                    translated_reactions = translate_emoticons_to_text([
+                        {"reaction": reaction.reaction.emoticon, reaction.reaction.emoticon: reaction.count}
+                        for reaction in message.reactions.results
+                    ])
+                    total_likes = sum(translated_reactions.values())  #
                     reactions_info = {
                         "results": [
                             {
-                                "reaction": encode_emoji_to_base64(reaction.reaction.emoticon),
-                                "count": reaction.count
+                                text: count        # Use count from translation
                             }
-                            for reaction in message.reactions.results
+                            for text, count in translated_reactions.items()
                         ],
+                        "total_likes": total_likes, 
                         "min": message.reactions.min,
                         "can_see_list": message.reactions.can_see_list,
                         "reactions_as_tags": message.reactions.reactions_as_tags,

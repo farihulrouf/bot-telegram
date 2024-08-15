@@ -1,11 +1,34 @@
-# utils/encode_emoji.py
+# Kamus emotikon ke teks
+# Kamus emotikon ke teks
+emoticon_to_text = {
+    "❤": "heart",          # Hati
+    "👍": "thumbs up",     # Jempol naik
+    "🙏": "prayer",        # Doa
+    "😢": "crying",        # Menangis
+    "😂": "laughing",      # Tertawa
+    "😎": "sunglasses",    # Kacamata hitam
+    "🎉": "party",         # Pesta
+    "💔": "broken heart",  # Hati patah
+    "😡": "angry",         # Marah
+    "😍": "heart eyes",    # Mata berbentuk hati
+    "🥳": "party face",    # Wajah berpesta
+    "💪": "muscle",        # Otot
+    "🌟": "star",          # Bintang
+    "🔥": "fire",          # Api
+    "🥺": "pleading",      # Memohon
+    "🙌": "raising hands", # Tangan terangkat
+    "🎂": "cake",          # Kue
+    "🚀": "rocket",        # Roket
+    "🌈": "rainbow"        # Pelangi
+}
 
-import base64
-
-def encode_emoji_to_base64(emoji: str) -> str:
-    # Convert the emoji to bytes using UTF-8 encoding
-    emoji_bytes = emoji.encode('utf-8')
-    # Encode the bytes to a base64 string
-    base64_bytes = base64.b64encode(emoji_bytes)
-    # Convert the base64 bytes to a string and return
-    return base64_bytes.decode('utf-8')
+# Fungsi untuk menerjemahkan emotikon ke teks
+def translate_emoticons_to_text(reactions):
+    translated_reactions = {}
+    for reaction in reactions:
+        emoticon = reaction.get('reaction')  # Ambil emotikon dari data
+        count = reaction.get(emoticon)       # Ambil jumlah dari data
+        # Ganti emotikon dengan teks jika ada di kamus
+        text = emoticon_to_text.get(emoticon, emoticon)
+        translated_reactions[text] = count  # Tambahkan hasil terjemahan ke dictionary baru
+    return translated_reactions
