@@ -19,7 +19,8 @@ emoticon_to_text = {
     "🙌": "raising hands", # Tangan terangkat
     "🎂": "cake",          # Kue
     "🚀": "rocket",        # Roket
-    "🌈": "rainbow"        # Pelangi
+    "🌈": "rainbow",       # Pelangi
+    "👀": "watching"
 }
 
 # Fungsi untuk menerjemahkan emotikon ke teks
