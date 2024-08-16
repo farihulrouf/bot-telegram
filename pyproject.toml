@@ -1,16 +1,14 @@
 [tool.poetry]
-name = "telegram"
+name = "telegram"  # Ganti dengan nama proyek Anda
 version = "0.1.0"
-description = "Bot Telegram"
+description = "Deskripsi singkat tentang proyek Anda"
 authors = ["Farihul Rouf <rouf@optimasi.ai>"]
-license = "MIT"
 
 [tool.poetry.dependencies]
-python = "^3.8"
-requests = "^2.26.0"
+python = "^3.12"
 
 [tool.poetry.dev-dependencies]
-pytest = "^6.2"
+pytest = "^6.2"  # Misalnya untuk testing
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
