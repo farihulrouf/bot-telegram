@@ -1,3 +1,6 @@
+# Ignore session files
+*.session
+
 # Ignore all files in the media directory
 /media/
 

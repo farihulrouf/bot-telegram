@@ -76,7 +76,7 @@ async def ensure_joined(client, username):
 
 async def get_channel_messages(
     phone: str,
-    channel_username: str,
+    channel_identifier: str,
     limit: Optional[int] = None,  # Default to None if not provided
     endpoint: str = os.getenv('SPACES_ENDPOINT'),
     bucket: str = os.getenv('SPACES_BUCKET'),
@@ -93,11 +93,27 @@ async def get_channel_messages(
         await client.connect()
 
     try:
-        if channel_username.startswith('@'):
-            channel_username = channel_username[1:]
+        # Determine if identifier is an ID or username
+        try:
+            # Try to get entity by ID
+            entity_id = int(channel_identifier)
+            entity = await client.get_entity(entity_id)
+        except ValueError:
+            # Not an integer, assume it's a username
+            if channel_identifier.startswith('@'):
+                channel_identifier = channel_identifier[1:]
+            entity = await client.get_entity(channel_identifier)
 
-        entity = await client.get_entity(channel_username)
-        channel_name = entity.username or str(entity.id)
+        # Determine if the entity is a channel or group
+        if entity.broadcast:  # This checks if it's a channel
+            channel_name = entity.username if entity.username else str(entity.id)
+            entity_type = "channel"
+        else:  # Assume it's a group
+            channel_name = entity.title if entity.title else "Group Description"
+            entity_type = "group"
+
+        # Log the identified entity type
+        logging.debug(f"Entity identified as a {entity_type}: {channel_name}")
 
         result = []
         offset_id = 0
@@ -127,9 +143,6 @@ async def get_channel_messages(
                 break
 
             for message in messages.messages:
-                # Extract channels from message and join
-                if message.message:
-                    await extract_and_join_channels(client, message.message)
 
                 sender_username = None
                 if message.sender_id:
