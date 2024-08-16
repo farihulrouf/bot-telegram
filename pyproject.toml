@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "bo_telegram"
+version = "0.1.0"
+description = "Bot Telegram"
+authors = ["farihulrouf <rouf@optimasi.ai>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.8"  # Sesuaikan dengan versi Python yang Anda gunakan
+# Tambahkan dependensi lainnya di sini
+requests = "^2.26.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^6.2"  # Contoh dependensi untuk pengujian
+# Tambahkan dependensi pengembangan lainnya di sini
+
+[tool.poetry.scripts]
+# Jika proyek Anda memiliki skrip CLI, daftarkan di sini
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
