@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "bo_telegram"
+name = "telegram"
 version = "0.1.0"
 description = "Bot Telegram"
 authors = ["Farihul Rouf <rouf@optimasi.ai>"]
