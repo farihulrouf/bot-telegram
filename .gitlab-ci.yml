@@ -1,19 +1,63 @@
-image: python:3.9
-
-stages:
-  - deploy
+image: python:latest
 
 variables:
-  PYTHONPATH: "/usr/local/lib/python3.9/site-packages"
+  PIP_CACHE_DIR: "$CI_PROJECT_DIR/.cache/pip"
+  SERVER_IP: "$SERVER_IP"
+  SFTP_USERNAME: "$SFTP_USERNAME"
+  SSH_PRIVATE_KEY: "$SSH_PRIVATE_KEY"
+  PASSPHRASE: "$PASSPHRASE"
+  SPACES_ENDPOINT: "$SPACES_ENDPOINT"
+  SPACES_BUCKET: "$SPACES_BUCKET"
+  SPACES_FOLDER: "$SPACES_FOLDER"
+  SPACES_ACCESS_KEY: "$SPACES_ACCESS_KEY"
+  SPACES_SECRET_KEY: "$SPACES_SECRET_KEY"
+
+cache:
+  paths:
+    - .cache/pip
 
 before_script:
-  - python -m pip install --upgrade pip
-  - pip install -r requirements.txt
+  - python --version ; pip --version  # For debugging
+  - pip install virtualenv
+  - virtualenv venv
+  - source venv/bin/activate
 
-deploy_production:
+test:
+  script:
+    - pip install ruff tox  # you can also use tox
+    - pip install --editable ".[test]"
+    - tox -e py,ruff
+
+run:
+  script:
+    - pip install -r requirements.txt  # Ensure this file is present and correct
+    # run the command here
+  artifacts:
+    paths:
+      - build/*
+
+pages:
+  script:
+    - pip install sphinx sphinx-rtd-theme
+    - cd doc
+    - make html
+    - mv build/html/ ../public/
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy:
   stage: deploy
   script:
-    - pip install ansible
-    - ansible-playbook -i inventory/production deploy.yml
+    - echo "Deploying to production environment..."
+    - apt-get update && apt-get install -y openssh-client  # Install SSH client
+    - eval $(ssh-agent -s)  # Start SSH agent
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' | ssh-add -  # Add SSH key
+    - scp -o StrictHostKeyChecking=no -r . $SFTP_USERNAME@$SERVER_IP:/home/peratan/bot_telagram  # Transfer files
+    - ssh -o StrictHostKeyChecking=no $SFTP_USERNAME@$SERVER_IP "cd /home/peratan/bot_telagram && ./deploy_script.sh"  # Run deployment script
+  environment:
+    name: production
   only:
-    - main
+    - master  # or your main branch name
