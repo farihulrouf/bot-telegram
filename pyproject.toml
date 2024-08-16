@@ -1,12 +1,18 @@
 [tool.poetry]
 name = "telegram"
 version = "0.1.0"
-description = "Bot Telegram"
+description = "Deskripsi singkat tentang paket"
 authors = ["Farihul Rouf <rouf@optimasi.ai>"]
 
 [tool.poetry.dependencies]
 python = "^3.12"
 
+[tool.poetry.dev-dependencies]
+# Daftar dependensi pengembangan seperti `ruff` dan `tox`
+
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.include]
+files = ["app/*"]
