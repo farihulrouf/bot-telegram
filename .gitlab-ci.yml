@@ -4,7 +4,7 @@ stages:
   - deploy
 
 variables:
-  VENV_PATH: "venv"
+  VENV_PATH: "myenv"
 
 before_script:
   - python -m venv $VENV_PATH
