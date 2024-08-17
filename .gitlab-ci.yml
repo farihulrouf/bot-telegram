@@ -11,6 +11,7 @@ variables:
   SPACES_FOLDER: "$SPACES_FOLDER"
   SPACES_ACCESS_KEY: "$SPACES_ACCESS_KEY"
   SPACES_SECRET_KEY: "$SPACES_SECRET_KEY"
+  DEPLOY_SERVER: "$DEPLOY_SERVER"  # Menambahkan DEPLOY_SERVER sebagai variabel
 
 cache:
   paths:
@@ -23,13 +24,21 @@ before_script:
   - virtualenv venv
   - source venv/bin/activate
 
+stages:
+  - test
+  - run
+  - deploy
+
 test:
+  stage: test
   script:
+    - pip install -r requirements.txt
     - pip install ruff tox
     - pip install --editable ".[test]"
     - tox -e py,ruff
 
 run:
+  stage: run
   script:
     - pip install -r requirements.txt
     - python app/main.py  # Pastikan command ini sesuai untuk menjalankan aplikasi Anda
