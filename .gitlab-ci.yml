@@ -25,7 +25,8 @@ test:
 deploy:
   stage: deploy
   script:
-    - echo "Deploying the application..."
-    - # Tambahkan skrip deployment Anda di sini
+    - echo "Deploying to server..."
+    - scp -r * $DEPLOY_SERVER:$DEPLOY_PATH
+    - ssh $DEPLOY_SERVER "cd $DEPLOY_PATH && source $VENV_PATH/bin/activate && pip install -r requirements.txt && nohup python your_app.py > app.log 2>&1 &"
   only:
     - main
