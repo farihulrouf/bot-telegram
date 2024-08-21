@@ -12,6 +12,11 @@ from app.utils.encode_emoji import translate_emoticons_to_text
 # Regex for detecting URLs
 URL_REGEX = re.compile(r'(https?://[^\s]+)')
 
+from typing import Dict, Any, Optional
+from telethon.tl.functions.messages import GetHistoryRequest
+from fastapi import HTTPException
+import logging
+
 async def read_all_messages(phone: str, channel_identifier: str, limit: Optional[int] = None) -> Dict[str, Any]:
     client = sessions.get(phone)
     if not client:
@@ -38,9 +43,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
             channel_name = entity.username if entity.username else str(entity.id)
         else:  # Assume it's a group
             channel_name = entity.title if entity.title else "Group Description"
-        
-        #id_entity =  channel_identifier
-        #print("cek", id_entity)
+
         all_messages = []
         offset_id = 0
         remaining_limit = limit if limit is not None else float('inf')  # Use infinity if no limit
@@ -57,7 +60,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                 min_id=0,
                 hash=0
             ))
-            
+
             if not messages.messages:
                 break
 
@@ -73,16 +76,16 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                 for url in urls:
                     if "t.me/joinchat/" in url:
                         await process_invite_url(url, client)
-                
+
                 # Handle reactions
                 reactions_info = None
                 if message.reactions:
-                     # Translate emoticons to text
+                    # Translate emoticons to text
                     translated_reactions = translate_emoticons_to_text([
                         {"reaction": reaction.reaction.emoticon, reaction.reaction.emoticon: reaction.count}
                         for reaction in message.reactions.results
                     ])
-                    total_likes = sum(translated_reactions.values())  #
+                    total_likes = sum(translated_reactions.values())
                     reactions_info = {
                         "results": [
                             {
@@ -90,7 +93,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
                             }
                             for text, count in translated_reactions.items()
                         ],
-                        "total_likes": total_likes, 
+                        "total_likes": total_likes,
                         "min": message.reactions.min,
                         "can_see_list": message.reactions.can_see_list,
                         "reactions_as_tags": message.reactions.reactions_as_tags,
@@ -125,6 +128,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
         raise HTTPException(status_code=500, detail=f"Failed to read messages: {str(e)}")
     finally:
         await client.disconnect()
+
 
 async def handle_media(message, channel_name):
     media_info = {
