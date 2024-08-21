@@ -1,5 +1,12 @@
 # Ignore session files
+sessions/
 *.session
+
+**/__pycache__/
+
+# Ignore Python bytecode files
+*.pyc
+*.pyo
 
 # Ignore all files in the media directory
 /media/
