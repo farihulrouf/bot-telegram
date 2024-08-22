@@ -32,6 +32,8 @@ deploy:
   stage: deploy
   script:
     - echo "Deploying to server..."
+    - mkdir -p ~/.ssh  # Create the .ssh directory
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa  # Write the private key to id_rsa
     - chmod 600 ~/.ssh/id_rsa  # Set permissions on the private key
     - ssh-add ~/.ssh/id_rsa <<< "$SSH_PASSPHRASE"  # Add the private key to SSH agent
     - ssh-keyscan -H $DEPLOY_SERVER >> ~/.ssh/known_hosts  # Add the server to known hosts
