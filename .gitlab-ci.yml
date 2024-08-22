@@ -24,6 +24,8 @@ test:
   stage: test
   script:
     - source $VENV_PATH/bin/activate  # Aktifkan virtual environment
+    - pip freeze  # Tampilkan paket yang terinstal untuk memeriksa apakah pytest terinstal
+    - which pytest  # Periksa lokasi pytest
     - pytest  # Jalankan pytest
 
 deploy:
