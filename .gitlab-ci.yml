@@ -28,7 +28,6 @@ test:
     - which pytest  # Periksa lokasi pytest
     - pytest --maxfail=1 --disable-warnings -v
 
-
 deploy:
   stage: deploy
   script:
