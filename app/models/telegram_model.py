@@ -86,6 +86,10 @@ class VerificationCode(BaseModel):
     code: str
     password: str = None
 
+class GroupSearchRequest(BaseModel):
+    phone: str
+    query: str
+
 def create_client(phone: str) -> TelegramClient:
     # Menggunakan file sesi yang dinamai dengan nomor telepon
     session_file = f"sessions/{phone}.session"
@@ -132,12 +136,15 @@ async def read_messages(phone: str):
     # Tambahkan event handler untuk menangani pesan baru
     client.add_event_handler(handle_message, events.NewMessage)
 
-    # Menjaga agar client tetap terhubung dan aktif untuk memproses pesan
-    try:
-        await client.run_until_disconnected()
-    except KeyboardInterrupt:
-        print("Disconnected due to user interrupt")
-    finally:
+    if await client.is_user_authorized():
+        # Menjaga agar client tetap terhubung dan aktif untuk memproses pesan
+        try:
+            await client.run_until_disconnected()
+        except KeyboardInterrupt:
+            print("Disconnected due to user interrupt")
+        finally:
+            await client.disconnect()
+    else:
         await client.disconnect()
-    
+
     return {"status": "messages_received"}

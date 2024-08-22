@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from pydantic import BaseModel
-from app.models.telegram_model import FileDetails, ListDataResponse, PhoneNumber,WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
+from app.models.telegram_model import FileDetails, ListDataResponse, PhoneNumber, WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, GroupSearchRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
 from app.controllers import telegram_crowler ,telegram_controller, telegram_message
 from typing import Dict, List, Any
 
@@ -8,15 +8,7 @@ import os
 
 router = APIRouter()
 
-
-@router.post("/api/send_message")
-async def send_message(request: SendMessageRequest):
-    try:
-        response = await telegram_controller.send_message(request.phone, request.recipient, request.message)
-        return response
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
+# ok
 @router.post("/api/login")
 async def login(phone: PhoneNumber):
     try:
@@ -25,6 +17,7 @@ async def login(phone: PhoneNumber):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# ok
 @router.post("/api/verify")
 async def verify(code: VerificationCode):
     try:
@@ -33,7 +26,57 @@ async def verify(code: VerificationCode):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.get("/api/get_message")
+# ok
+@router.post("/api/logout")
+async def login(phone: PhoneNumber):
+    try:
+        response = await telegram_controller.logout(phone)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ok
+@router.post("/api/status")
+async def login(phone: PhoneNumber):
+    try:
+        response = await telegram_controller.status(phone)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ok
+@router.post("/api/send_message")
+async def send_message(request: SendMessageRequest):
+    try:
+        response = await telegram_controller.send_message(request.phone, request.recipient, request.message)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ok
+@router.post("/api/group/join")
+async def join_channel(request: JoinRequest):
+    try:
+        response = await telegram_controller.join_subscribe(request.phone, request.username_channel)
+        if response["status"] == "error":
+            raise HTTPException(status_code=400, detail=response["message"])
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ok
+@router.post("/api/group/leave")
+async def leave_channel(request: JoinRequest):
+    try:
+        response = await telegram_controller.channel_leave(request.phone, request.username_channel)
+        if response["status"] == "error":
+            raise HTTPException(status_code=400, detail=response["message"])
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ok
+@router.get("/api/group/messages")
 async def get_message(
     phone: str = Query(...),
     channel_username: str = Query(...),
@@ -45,16 +88,18 @@ async def get_message(
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-@router.post("/api/join/subscribe")
-async def join_channel(request: JoinRequest):
+# ok
+@router.post("/api/group/search")
+async def get_message(request: GroupSearchRequest):
     try:
-        response = await telegram_controller.join_subscribe(request.phone, request.username_channel)
-        if response["status"] == "error":
-            raise HTTPException(status_code=400, detail=response["message"])
+        response = await telegram_controller.group_search(request.phone, request.query)
         return response
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ----------------- untested ------
+
 @router.post("/api/getchannelname", response_model=ChannelNamesResponse)
 async def get_channel_names(request: TextRequest) -> ChannelNamesResponse:
     try:
@@ -99,6 +144,7 @@ async def get_channel_details(phone: str = Query(...), channel_username: str = Q
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
+
 @router.get("/api/getcontacts", response_model=List[ContactResponse])
 async def get_all_contacts(phone: str = Query(...)):
     try:
@@ -120,6 +166,7 @@ async def get_user_details(phone: str = Query(...), username: str = Query(...)):
         return response
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @router.post("/api/webhook")
 async def receive_webhook(payload: WebhookPayload):

@@ -2,12 +2,12 @@ import logging
 from telethon.errors import SessionPasswordNeededError , FloodWaitError, InviteHashExpiredError, InviteHashInvalidError
 from telethon import TelegramClient, events, utils, errors
 from telethon.tl.types import PeerChannel, ChatPhoto, UserProfilePhoto, ChannelFull, InputPhoneContact, InputUser, ChannelParticipantsSearch
-from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.functions.contacts import GetContactsRequest, SearchRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
-from telethon.tl.functions.channels import JoinChannelRequest, GetFullChannelRequest, GetParticipantsRequest
+from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest, GetFullChannelRequest, GetParticipantsRequest
 from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 from fastapi.encoders import jsonable_encoder
@@ -54,14 +54,14 @@ async def send_message(phone: str, recipient: str, message: str):
 async def login(phone: PhoneNumber):
     client = create_client(phone.phone)
     await client.connect()
-
     try:
         await client.send_code_request(phone.phone)
         sessions[phone.phone] = client
         logging.debug(f"Session created and stored for phone: {phone.phone}")
         return {"status": "code_sent"}
     except Exception as e:
-        await client.disconnect()
+        if client:
+            await client.disconnect()
         raise Exception(f"Failed to send code: {str(e)}")
 
 async def verify(code: VerificationCode):
@@ -102,7 +102,44 @@ async def verify(code: VerificationCode):
         raise Exception(f"Failed to verify code: {str(e)}")
 
     finally:
-        await client.disconnect()
+        if client:
+            await client.disconnect()
+
+async def logout(phone: PhoneNumber):
+    client = sessions.get(phone.phone)
+    try:
+        if client:
+            if not client.is_connected():
+                await client.connect()
+
+            await client.log_out()
+            logging.debug(f"Successfully logged out for phone: {phone.phone}")
+            del sessions[phone.phone]
+        else:
+            logging.warning(f"No active session found for phone: {phone_number}")
+            return {"status": "no_active_session"}
+        return {"status": "logout success"}
+    except Exception as e:
+        if client:
+            await client.disconnect()
+        raise Exception(f"Failed to send code: {str(e)}")
+
+async def status(phone: PhoneNumber):
+    client = sessions.get(phone.phone)
+    try:
+        status = 0
+        if client:
+            if client.is_connected():
+                await client.connect()
+
+            if await client.is_user_authorized():
+                status = 1
+
+        return {"status": status}
+    except Exception as e:
+        if client:
+            await client.disconnect()
+        raise Exception(f"Failed to send code: {str(e)}")
 
 def process_bytes_in_dict(data):
     for key, value in data.items():
@@ -147,6 +184,100 @@ async def join_subscribe(phone: str, username_channel: str):
         await client(JoinChannelRequest(username_channel))
         logging.debug(f"Successfully joined the channel: {username_channel}")
         return {"status": "joined_channel", "channel": username_channel}
+    except FloodWaitError as e:
+        logging.error(f"Must wait for {e.seconds} seconds before trying again.")
+        return {"status": "flood_wait", "seconds": e.seconds}
+    except InviteHashExpiredError:
+        logging.error("The invite link has expired.")
+        return {"status": "invite_link_expired"}
+    except InviteHashInvalidError:
+        logging.error("The invite link is invalid.")
+        return {"status": "invite_link_invalid"}
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        await client.disconnect()
+
+async def channel_leave(phone: str, username_channel: str):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+    
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        if username_channel.startswith('@'):
+            username_channel = username_channel[1:]
+
+        await client(LeaveChannelRequest(username_channel))
+        logging.debug(f"Successfully leave the channel: {username_channel}")
+        return {"status": "leave_channel", "channel": username_channel}
+    except FloodWaitError as e:
+        logging.error(f"Must wait for {e.seconds} seconds before trying again.")
+        return {"status": "flood_wait", "seconds": e.seconds}
+    except InviteHashExpiredError:
+        logging.error("The invite link has expired.")
+        return {"status": "invite_link_expired"}
+    except InviteHashInvalidError:
+        logging.error("The invite link is invalid.")
+        return {"status": "invite_link_invalid"}
+    except Exception as e:
+        logging.error(f"An error occurred: {e}")
+        return {"status": "error", "message": str(e)}
+    finally:
+        await client.disconnect()
+
+async def group_search(phone: str, query: str):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+    
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        result = await client(SearchRequest(q=query,limit=100))
+
+        response = []
+
+        # takeout jika title tidak mengandung keyword
+        for o in result.chats:
+            # if query.lower() not in o.title.lower():
+            #     continue
+
+            time.sleep(3)
+            messages = await client.get_messages(o, limit=1) #pass your own args
+
+            response.append({
+                'name' : (o.title.encode("ascii", "ignore")).decode(),
+                'original_id' : o.id,
+                'username' : o.username,
+                'created_at' : int(o.date.timestamp()),
+                'type' : 'channel',
+                'members' : o.participants_count,
+                'chats' : messages.total,
+                'access_hash' : o.access_hash
+            })
+    
+        # # ambil data users
+        # for o in result.users:
+        #     name = o.first_name if str(o.last_name) == 'None' else o.first_name +' '+ o.last_name
+        #     response.append({
+        #         'name' : (name.encode("ascii", "ignore")).decode(),
+        #         'original_id' : o.id,
+        #         'username' : o.username,
+        #         'created_at' : '',
+        #         'type' : 'user',
+        #         'members' : 0,
+        #         'chats' : 0,
+        #         'access_hash' : o.access_hash
+        #     })
+        
+        logging.debug(f"Successfully search group: {query}")
+
+        return {"status": "group_search", "query": query, "data": response}
     except FloodWaitError as e:
         logging.error(f"Must wait for {e.seconds} seconds before trying again.")
         return {"status": "flood_wait", "seconds": e.seconds}
