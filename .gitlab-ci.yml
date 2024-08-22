@@ -32,7 +32,13 @@ deploy:
   stage: deploy
   script:
     - echo "Deploying to server..."
-    - scp -r * $DEPLOY_SERVER:$DEPLOY_PATH
-    - ssh $DEPLOY_SERVER "cd $DEPLOY_PATH && source $VENV_PATH/bin/activate && pip install -r requirements.txt && nohup python your_app.py > app.log 2>&1 &"
+    - scp -r * $DEPLOY_USER@$DEPLOY_SERVER:$DEPLOY_PATH
+    - ssh $DEPLOY_USER@$DEPLOY_SERVER << 'EOF'
+        python3 -m venv $VENV_PATH
+        source $VENV_PATH/bin/activate
+        cd $DEPLOY_PATH
+        pip install -r requirements.txt
+        nohup uvicorn app.main:app --host 0.0.0.0 --port 8005 > app.log 2>&1 &
+      EOF
   only:
     - main
