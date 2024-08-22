@@ -45,3 +45,5 @@ sessions/
 
 # Ignore log files
 *.log
+
+telegram-runner.js
