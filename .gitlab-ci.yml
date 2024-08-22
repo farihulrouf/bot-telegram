@@ -54,4 +54,4 @@ deploy:
         echo "Deployment complete"
       EOF
   only:
-    - main
+    - dev
