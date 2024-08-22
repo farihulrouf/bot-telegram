@@ -5,9 +5,6 @@ stages:
   - test
   - deploy
 
-variables:
-  VENV_PATH: "myenv"
-
 before_script:
   - apt-get update && apt-get install -y python3-venv
   - python3 -m venv $VENV_PATH
@@ -33,7 +30,7 @@ deploy:
   script:
     - echo "Deploying to server..."
     - scp -r * $DEPLOY_USER@$DEPLOY_SERVER:$DEPLOY_PATH
-    - ssh $DEPLOY_USER@$DEPLOY_SERVER << EOF
+    - ssh $DEPLOY_USER@$DEPLOY_SERVER << 'EOF'
         # Buat virtual environment dan aktifkan
         python3 -m venv $VENV_PATH
         source $VENV_PATH/bin/activate
