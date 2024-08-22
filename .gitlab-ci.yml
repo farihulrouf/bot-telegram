@@ -5,6 +5,9 @@ stages:
   - test
   - deploy
 
+variables:
+  VENV_PATH: "myenv"
+
 before_script:
   - apt-get update && apt-get install -y python3-venv
   - python3 -m venv $VENV_PATH
@@ -29,20 +32,7 @@ deploy:
   stage: deploy
   script:
     - echo "Deploying to server..."
-    - scp -r * $DEPLOY_USER@$DEPLOY_SERVER:$DEPLOY_PATH
-    - ssh $DEPLOY_USER@$DEPLOY_SERVER << 'EOF'
-        # Buat virtual environment dan aktifkan
-    - python3 -m venv $VENV_PATH
-    - source $VENV_PATH/bin/activate
-        
-        # Pindah ke direktori deploy
-    - cd $DEPLOY_PATH
-        
-        # Install dependencies
-    - pip install -r requirements.txt
-        
-        # Jalankan aplikasi dengan uvicorn
-    - nohup uvicorn app.main:app --host 0.0.0.0 --port 8005 > app.log 2>&1 &
-      EOF
+    - scp -r * $DEPLOY_SERVER:$DEPLOY_PATH
+    - ssh $DEPLOY_SERVER "cd $DEPLOY_PATH && source $VENV_PATH/bin/activate && pip install -r requirements.txt && nohup python your_app.py > app.log 2>&1 &"
   only:
     - main
