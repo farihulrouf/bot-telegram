@@ -11,6 +11,7 @@ from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelReque
 from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 from fastapi.encoders import jsonable_encoder
+from app.controllers.webhook import webhook_push
 import asyncio
 import base64
 import os
@@ -274,6 +275,12 @@ async def group_search(phone: str, query: str):
         #         'chats' : 0,
         #         'access_hash' : o.access_hash
         #     })
+
+        section_webhook = "group_search"
+        await webhook_push(section_webhook, {
+            "query": query,
+            "data": response
+        })
         
         logging.debug(f"Successfully search group: {query}")
 

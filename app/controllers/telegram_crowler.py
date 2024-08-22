@@ -13,6 +13,7 @@ from telethon.tl.functions.messages import GetHistoryRequest
 from app.utils.utils import upload_file_to_spaces
 import re
 from typing import Optional
+from app.controllers.webhook import webhook_push
 
 # Set up logging
 #logging.basicConfig(level=logging.DEBUG)
@@ -233,6 +234,13 @@ async def get_channel_messages(
                 remaining_limit -= len(messages.messages)
                 if remaining_limit <= 0:
                     break
+
+        section_webhook = "group_messages"
+        await webhook_push(section_webhook, {
+            "phone": phone,
+            "channel": channel_identifier,
+            "data": result
+        })
 
         await client.disconnect()
         return {"status": "messages_received", "total_messages_read": total_messages_read, "messages": result}

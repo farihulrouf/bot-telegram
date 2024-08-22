@@ -1,8 +1,9 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from pydantic import BaseModel
 from app.models.telegram_model import FileDetails, ListDataResponse, PhoneNumber, WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, GroupSearchRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
 from app.controllers import telegram_crowler ,telegram_controller, telegram_message
 from typing import Dict, List, Any
+import asyncio
 
 import os
 
@@ -78,22 +79,23 @@ async def leave_channel(request: JoinRequest):
 # ok
 @router.get("/api/group/messages")
 async def get_message(
+    background_tasks: BackgroundTasks,
     phone: str = Query(...),
     channel_username: str = Query(...),
-    limit: int = Query(10)  # Removed the maximum limit constraint
+    limit: int = Query(10)
 ):
     try:
-        response = await telegram_crowler.get_channel_messages(phone, channel_username, limit)
-        return response
+        background_tasks.add_task(telegram_crowler.get_channel_messages, phone, channel_username, limit)
+        return {"status": "starting fetch group messages", "username": channel_username}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 # ok
 @router.post("/api/group/search")
-async def get_message(request: GroupSearchRequest):
+async def get_group_search(background_tasks: BackgroundTasks, request: GroupSearchRequest):
     try:
-        response = await telegram_controller.group_search(request.phone, request.query)
-        return response
+        background_tasks.add_task(telegram_controller.group_search, request.phone, request.query)
+        return {"status": "starting group search", "query": request.query}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
