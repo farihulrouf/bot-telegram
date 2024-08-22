@@ -26,7 +26,7 @@ test:
     - source $VENV_PATH/bin/activate  # Aktifkan virtual environment
     - pip freeze  # Tampilkan paket yang terinstal untuk memeriksa apakah pytest terinstal
     - which pytest  # Periksa lokasi pytest
-    - pytest  # Jalankan pytest
+    - pytest --maxfail=1 --disable-warnings -q  # Jalankan pytest dengan parameter tambahan
 
 deploy:
   stage: deploy
