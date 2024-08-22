@@ -6,6 +6,7 @@ from telethon.tl.functions.contacts import GetContactsRequest, SearchRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
+from app.models.telegram_model import active_clients, read_messages
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest, GetFullChannelRequest, GetParticipantsRequest
 from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
@@ -31,8 +32,6 @@ SERVER_IP = os.getenv('SERVER_IP')
 SFTP_USERNAME = os.getenv('SFTP_USERNAME')
 SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
 PASSPHRASE = os.getenv('PASSPHRASE')
-#logging.basicConfig(level=logging.DEBUG)
-
 
 async def send_message(phone: str, recipient: str, message: str):
     client = sessions.get(phone)
@@ -76,11 +75,14 @@ async def verify(code: VerificationCode):
     try:
         await client.sign_in(code.phone, code.code)
 
-        if client.is_user_authorized():
+        if await client.is_user_authorized():
             me = await client.get_me()
             me_dict = me.to_dict()
             me_dict = process_bytes_in_dict(me_dict)  # Process bytes if any
             logging.debug(f"User logged in: {me}")
+
+            active_clients[code.phone] = asyncio.create_task(read_messages(code.phone))
+
             return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
 
         elif code.password:
@@ -89,6 +91,9 @@ async def verify(code: VerificationCode):
             me_dict = me.to_dict()
             me_dict = process_bytes_in_dict(me_dict)  # Process bytes if any
             logging.debug(f"User logged in with 2FA: {me}")
+
+            active_clients[code.phone] = asyncio.create_task(read_messages(code.phone))
+
             return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
 
         else:
@@ -102,10 +107,6 @@ async def verify(code: VerificationCode):
         logging.error(f"Failed to verify code: {str(e)}")
         raise Exception(f"Failed to verify code: {str(e)}")
 
-    finally:
-        if client:
-            await client.disconnect()
-
 async def logout(phone: PhoneNumber):
     client = sessions.get(phone.phone)
     try:
@@ -116,6 +117,17 @@ async def logout(phone: PhoneNumber):
             await client.log_out()
             logging.debug(f"Successfully logged out for phone: {phone.phone}")
             del sessions[phone.phone]
+
+            # remove task
+            task = active_clients.pop(phone.phone, None)
+            if not task is None:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    return {"status": f"Task for phone {phone.phone} was cancelled"}
+                except Exception as e:
+                    return {"status": f"Task for phone {phone.phone} raised an exception: {str(e)}"}
         else:
             logging.warning(f"No active session found for phone: {phone_number}")
             return {"status": "no_active_session"}

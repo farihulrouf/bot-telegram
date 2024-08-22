@@ -1,20 +1,20 @@
 from fastapi import APIRouter, HTTPException, Query, Depends, BackgroundTasks
 from pydantic import BaseModel
 from app.models.telegram_model import FileDetails, ListDataResponse, PhoneNumber, WebhookPayload, ContactResponse, ChannelDetailResponse, VerificationCode, JoinRequest, GroupSearchRequest, TextRequest, SendMessageRequest, ChannelNamesResponse, ChannelNamesResponseAll
+from app.models.telegram_model import active_clients
 from app.controllers import telegram_crowler ,telegram_controller, telegram_message
 from typing import Dict, List, Any
 import asyncio
-
 import os
 
 router = APIRouter()
 
 # ok
 @router.post("/api/login")
-async def login(phone: PhoneNumber):
+async def login(background_tasks: BackgroundTasks, phone: PhoneNumber):
     try:
-        response = await telegram_controller.login(phone)
-        return response
+        background_tasks.add_task(telegram_controller.login, phone)
+        return {"status": "requesting token", "phone": phone}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

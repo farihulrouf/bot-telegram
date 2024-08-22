@@ -20,6 +20,10 @@ webhook_url = os.getenv('WEBHOOK_URL')
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
 
+# Active clients
+active_clients: Dict[str, asyncio.Task] = {}
+
+
 class FileDetails(BaseModel):
     name: str
     size: int
