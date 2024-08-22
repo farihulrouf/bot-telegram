@@ -15,7 +15,7 @@ load_dotenv()
 
 api_id = os.getenv('API_ID')
 api_hash = os.getenv('API_HASH')
-webhook_url = 'http://localhost:8000/api/webhook'
+webhook_url = os.getenv('WEBHOOK')
 
 # Dictionary untuk menyimpan sesi aktif
 sessions = {}
