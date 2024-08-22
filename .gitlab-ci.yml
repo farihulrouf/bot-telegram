@@ -1,4 +1,5 @@
 image: python:3.12
+
 stages:
   - build
   - test
@@ -22,7 +23,8 @@ build:
 test:
   stage: test
   script:
-    - pytest
+    - source $VENV_PATH/bin/activate  # Aktifkan virtual environment
+    - pytest  # Jalankan pytest
 
 deploy:
   stage: deploy
