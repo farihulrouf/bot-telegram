@@ -5,13 +5,14 @@
 module.exports = {
   apps: [
     {
-      name: "Telegram-Api",
-      script: "./venv/bin/uvicorn",
-      args: "app.main:app",
-      env: {
-        APP_ENV: "production",
-        SECRET_KEY: "your_secret_key"
+        name: "Telegram-Api",
+        script: "./venv/bin/uvicorn",
+        args: "app.main:app --host 0.0.0.0 --port 8000",
+        interpreter: "./venv/bin/python3",
+        env: {
+          APP_ENV: "production",
+          SECRET_KEY: "your_secret_key"
+        }
       }
-    }
   ]
 }
