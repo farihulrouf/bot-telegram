@@ -6,7 +6,7 @@ from telethon.tl.functions.contacts import GetContactsRequest, SearchRequest
 from telethon.tl.functions.users import GetFullUserRequest
 from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
-from app.models.telegram_model import active_clients, read_messages
+from app.models.telegram_model import active_clients, listen_messages
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
 from telethon.tl.functions.channels import JoinChannelRequest, LeaveChannelRequest, GetFullChannelRequest, GetParticipantsRequest
 from app.utils.utils import upload_file_to_spaces  # Pastikan path impor sesuai dengan struktur direktori Anda
@@ -81,7 +81,7 @@ async def verify(code: VerificationCode):
             me_dict = process_bytes_in_dict(me_dict)  # Process bytes if any
             logging.debug(f"User logged in: {me}")
 
-            active_clients[code.phone] = asyncio.create_task(read_messages(code.phone))
+            active_clients[code.phone] = asyncio.create_task(listen_messages(code.phone))
 
             return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
 
@@ -92,7 +92,7 @@ async def verify(code: VerificationCode):
             me_dict = process_bytes_in_dict(me_dict)  # Process bytes if any
             logging.debug(f"User logged in with 2FA: {me}")
 
-            active_clients[code.phone] = asyncio.create_task(read_messages(code.phone))
+            active_clients[code.phone] = asyncio.create_task(listen_messages(code.phone))
 
             return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
 
@@ -254,7 +254,7 @@ async def group_search(phone: str, query: str):
         result = await client(SearchRequest(q=query,limit=100))
 
         response = []
-
+        
         # takeout jika title tidak mengandung keyword
         for o in result.chats:
             # if query.lower() not in o.title.lower():
@@ -263,12 +263,19 @@ async def group_search(phone: str, query: str):
             time.sleep(3)
             messages = await client.get_messages(o, limit=1) #pass your own args
 
+            ctype = "group"
+            if isinstance(o,Channel):
+                ctype = "channel"
+
+            # need to download
+            # photo=ChatPhoto(photo_id=5771857011674299893
+
             response.append({
                 'name' : (o.title.encode("ascii", "ignore")).decode(),
                 'original_id' : o.id,
                 'username' : o.username,
                 'created_at' : int(o.date.timestamp()),
-                'type' : 'channel',
+                'type' : ctype,
                 'members' : o.participants_count,
                 'chats' : messages.total,
                 'access_hash' : o.access_hash

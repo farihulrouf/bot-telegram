@@ -1,7 +1,7 @@
 from fastapi import FastAPI, BackgroundTasks
 import asyncio
 import os
-from app.models.telegram_model import create_client, read_messages, sessions, active_clients
+from app.models.telegram_model import create_client, listen_messages, sessions, active_clients
 from app.views import telegram_view
 
 app = FastAPI()
@@ -11,10 +11,11 @@ app.include_router(telegram_view.router)
 
 @app.on_event("startup")
 async def startup_event():
+    None
     # Mulai mendengarkan pesan untuk setiap nomor telepon di sessions
     for phone, client in sessions.items():
         # Mulai mendengarkan pesan
-        active_clients[phone] = asyncio.create_task(read_messages(phone))
+        active_clients[phone] = asyncio.create_task(listen_messages(phone))
 
 if __name__ == "__main__":
     import uvicorn

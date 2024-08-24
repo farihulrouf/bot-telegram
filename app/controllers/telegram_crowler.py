@@ -5,15 +5,21 @@ import logging
 import mimetypes
 import sys
 from telethon import TelegramClient
-from app.models.telegram_model import create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
+from app.models.telegram_model import create_client, read_sender, read_message, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.tl.types import PeerChannel
+from telethon.tl.types import PeerChannel, User, Channel, Chat
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.utils.utils import upload_file_to_spaces
 import re
 from typing import Optional
 from app.controllers.webhook import webhook_push
+from dotenv import load_dotenv
+
+# Muat variabel lingkungan dari file .env
+load_dotenv()
+
+webhook_url = os.getenv('WEBHOOK_URL')
 
 # Set up logging
 #logging.basicConfig(level=logging.DEBUG)
@@ -105,23 +111,24 @@ async def get_channel_messages(
                 channel_identifier = channel_identifier[1:]
             entity = await client.get_entity(channel_identifier)
 
-        # Determine if the entity is a channel or group
-        if entity.broadcast:  # This checks if it's a channel
-            channel_name = entity.username if entity.username else str(entity.id)
-            entity_type = "channel"
-        else:  # Assume it's a group
-            channel_name = entity.title if entity.title else "Group Description"
-            entity_type = "group"
+        group_id = entity.id
+        entity_type = "group"
+        if isinstance(entity,Channel):
+            if entity.broadcast:
+                entity_type = "channel"
+        elif isinstance(entity,Chat):
+            None
+        else:
+            return
 
-        # Log the identified entity type
-        logging.debug(f"Entity identified as a {entity_type}: {channel_name}")
-
-        result = []
+        # result = []
         offset_id = 0
 
         # Initialize remaining_limit with the provided limit or None
         remaining_limit = limit
         total_messages_read = 0
+
+        senders = {}
 
         while True:
             # Set batch_limit to 100 or the remaining_limit if it is specified
@@ -137,97 +144,57 @@ async def get_channel_messages(
                 hash=0
             ))
 
+            new_senders = []
+            for user in messages.users:
+                if not user.id in senders:
+                    sender = await read_sender(client, user)
+                    senders[user.id] = sender
+                    new_senders.append(sender)
+
+            # simpan ke webhook
+            section_webhook = "senders"
+            await webhook_push(section_webhook, new_senders)
+
             # Log number of messages received
             logging.debug(f"Number of messages received: {len(messages.messages)}")
 
             if not messages.messages:
                 break
-
+            
+            new_events = []
             for message in messages.messages:
+                
+                sender = None
 
-                sender_username = None
-                if message.sender_id:
-                    sender_entity = await client.get_entity(message.sender_id)
-                    sender_username = sender_entity.username
+                if message.from_id == None:
+                    pid = None
+                    
+                    if isinstance(message.peer_id, PeerChannel):
+                        pid = message.peer_id.channel_id
+                    elif isinstance(message.peer_id, PeerChat):
+                        pid = message.peer_id.chat_id
 
-                message_data = {
-                    "username": sender_username,
-                    "sender_id": message.sender_id,
-                    "text": message.message if message.message else "",
-                    "date": message.date.isoformat(),
-                    "media": None
-                }
+                    if pid in senders:
+                        sender = senders[pid]
+                    else:
+                        entity = await client.get_entity(pid)
+                        sender = await read_sender(client, entity)
+                    
+                event = await read_message(client, message, sender)
+                new_events.append(event)
 
-                if message.media:
-                    try:
-                        file_stream = io.BytesIO()
-                        file_name = ''
-                        file_extension = ''
-                        remote_file_path = ''
-
-                        global start_time
-                        start_time = time.time()
-
-                        if isinstance(message.media, MessageMediaPhoto):
-                            logging.debug(f"Downloading photo media from message ID: {message.id}")
-                            await client.download_media(message.media.photo, file=file_stream, progress_callback=report_progress)
-                            file_extension = 'jpg'
-                            file_name = next((attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), f"photo_{message.id}.{file_extension}")
-
-                        elif isinstance(message.media, MessageMediaDocument):
-                            doc = message.media.document
-                            logging.debug(f"Downloading document media from message ID: {message.id}")
-                            await client.download_media(doc, file=file_stream, progress_callback=report_progress)
-                            mime_type = doc.mime_type
-                            file_extension = mimetypes.guess_extension(mime_type) or '.bin'
-                            file_name = next((attr.file_name for attr in doc.attributes if hasattr(attr, 'file_name')), f"{doc.id}{file_extension}")
-
-                        else:
-                            logging.debug(f"Downloading other media from message ID: {message.id}")
-                            await client.download_media(message.media, file=file_stream, progress_callback=report_progress)
-                            mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
-                            file_extension = mimetypes.guess_extension(mime_type) or 'bin'
-                            file_name = f"{message.media.id}.{file_extension}"
-
-                        # Sanitize file name
-                        file_name = sanitize_filename(file_name)
-                       
-                        file_stream.seek(0)
-                        logging.debug(f"Uploading file with name: {file_name}")
-                        uploaded_file_url = upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secret_key, endpoint, bucket, folder)
-                        
-                        logging.debug(f"Uploaded file URL: {uploaded_file_url}")
-                        
-                        if not uploaded_file_url:
-                            raise Exception("File upload returned an invalid URL.")
-
-                        mime_type = mimetypes.guess_type(file_name)[0]
-                        media_type = "document"
-                        if mime_type:
-                            if mime_type.startswith('image/'):
-                                media_type = "photo"
-                            elif mime_type.startswith('video/'):
-                                media_type = "video"
-                            elif mime_type.startswith('audio/'):
-                                media_type = "audio"
-                            elif mime_type in ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']:
-                                media_type = "document"
-                            else:
-                                media_type = "file"
-
-                        message_data["media"] = {
-                            "type": media_type,
-                            "path": uploaded_file_url
-                        }
-
-                    except Exception as e:
-                        logging.error(f"Error downloading or uploading media: {e}")
-                        message_data["media"] = {"type": "error", "path": None}
-
-                result.append(message_data)
+                # result.append(event)
                 total_messages_read += 1
 
             offset_id = messages.messages[-1].id  # Update offset_id to the last message ID
+
+            # simpan ke webhook
+            section_webhook = "group_messages"
+            await webhook_push(section_webhook, {
+                "phone": phone,
+                "channel": channel_identifier,
+                "data": new_events
+            })
 
             # Break the loop if limit has been reached
             if remaining_limit is not None:
@@ -235,15 +202,8 @@ async def get_channel_messages(
                 if remaining_limit <= 0:
                     break
 
-        section_webhook = "group_messages"
-        await webhook_push(section_webhook, {
-            "phone": phone,
-            "channel": channel_identifier,
-            "data": result
-        })
-
         await client.disconnect()
-        return {"status": "messages_received", "total_messages_read": total_messages_read, "messages": result}
+        return {"status": "messages_received", "total_messages_read": total_messages_read}
 
     except Exception as e:
         await client.disconnect()

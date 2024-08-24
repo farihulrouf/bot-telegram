@@ -16,3 +16,6 @@ async def webhook_push(section: str, data):
         "data": data
     }
     response = requests.post(webhook_url, headers=headers, data=json.dumps(params))
+    print("\n response:")
+    print(section)
+    print(response.text)
