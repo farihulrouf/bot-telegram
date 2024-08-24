@@ -204,6 +204,8 @@ async def get_channel_messages(
                 if remaining_limit <= 0:
                     break
 
+            time.sleep(5)
+
         # await client.disconnect()
         return {"status": "messages_received", "total_messages_read": total_messages_read}
 
