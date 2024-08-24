@@ -14,7 +14,7 @@ router = APIRouter()
 async def login(background_tasks: BackgroundTasks, phone: PhoneNumber):
     try:
         background_tasks.add_task(telegram_controller.login, phone)
-        return {"status": "requesting token", "phone": phone}
+        return {"status": "success", "phone": phone, "message": "requesting token"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -96,6 +96,15 @@ async def get_group_search(background_tasks: BackgroundTasks, request: GroupSear
     try:
         background_tasks.add_task(telegram_controller.group_search, request.phone, request.query)
         return {"status": "starting group search", "query": request.query}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ok
+@router.get("/api/devices")
+async def get_devices(query: str | None = Query(default=None),):
+    try:
+        # background_tasks.add_task(telegram_controller.group_search, request.phone, request.query)
+        return {"status": "success", "data": sessions}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

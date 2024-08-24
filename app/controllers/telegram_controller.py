@@ -133,14 +133,24 @@ async def logout(phone: PhoneNumber):
                 task.cancel()
                 try:
                     await task
-                except asyncio.CancelledError:
-                    return {"status": f"Task for phone {phone.phone} was cancelled"}
+                # except asyncio.CancelledError:
+                #     return {"status": f"Task for phone {phone.phone} was cancelled"}
                 except Exception as e:
-                    return {"status": f"Task for phone {phone.phone} raised an exception: {str(e)}"}
+                    None
+                    # return {"status": f"Task for phone {phone.phone} raised an exception: {str(e)}"}
+
+            return {
+                "status": "success"
+                "message": f"client {phone.phone} probably completely removed"
+            }
         else:
             logging.warning(f"No active session found for phone: {phone.phone}")
-            return {"status": "no_active_session"}
-        return {"status": "logout success"}
+
+        return {
+            "status": "success"
+            "message": "no active client"
+        }
+
     except Exception as e:
         # if client:
         #     await client.disconnect()
@@ -312,7 +322,7 @@ async def group_search(phone: str, query: str):
         
         logging.debug(f"Successfully search group: {query}")
 
-        return {"status": "group_search", "query": query, "data": response}
+        return {"status": "success", "query": query, "data": response}
     except FloodWaitError as e:
         logging.error(f"Must wait for {e.seconds} seconds before trying again.")
         return {"status": "flood_wait", "seconds": e.seconds}

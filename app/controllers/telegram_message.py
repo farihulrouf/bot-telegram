@@ -31,7 +31,7 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
             # Try to get entity by ID
             entity_id = int(channel_identifier)
             entity = await client.get_entity(entity_id)
-            print("cek", entity)
+            # print("cek", entity)
         except ValueError:
             # Not an integer, assume it's a username
             if channel_identifier.startswith('@'):
