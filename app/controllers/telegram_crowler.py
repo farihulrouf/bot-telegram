@@ -8,7 +8,7 @@ from telethon import TelegramClient
 from app.models.telegram_model import create_client, read_sender, read_message, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from telethon.tl.types import MessageMediaPhoto, MessageMediaDocument
 from telethon.tl.functions.channels import JoinChannelRequest
-from telethon.tl.types import PeerChannel, User, Channel, Chat
+from telethon.tl.types import PeerUser, PeerChat, PeerChannel, User, Channel, Chat
 from telethon.tl.functions.messages import GetHistoryRequest
 from app.utils.utils import upload_file_to_spaces
 import re
@@ -130,9 +130,11 @@ async def get_channel_messages(
 
         senders = {}
 
+        print("-- start pulling...")
+
         while True:
             # Set batch_limit to 100 or the remaining_limit if it is specified
-            batch_limit = 100 if remaining_limit is None else min(100, remaining_limit)
+            batch_limit = 50 if remaining_limit is None else min(50, remaining_limit)
             messages = await client(GetHistoryRequest(
                 peer=entity,
                 offset_id=offset_id,
@@ -144,6 +146,11 @@ async def get_channel_messages(
                 hash=0
             ))
 
+            print(f"-- got {len(messages.messages)} messages")
+
+            # Log number of messages received
+            logging.debug(f"Number of messages received: {len(messages.messages)}")
+
             new_senders = []
             for user in messages.users:
                 if not user.id in senders:
@@ -154,9 +161,6 @@ async def get_channel_messages(
             # simpan ke webhook
             section_webhook = "senders"
             await webhook_push(section_webhook, new_senders)
-
-            # Log number of messages received
-            logging.debug(f"Number of messages received: {len(messages.messages)}")
 
             if not messages.messages:
                 break
@@ -172,20 +176,21 @@ async def get_channel_messages(
                         pid = message.peer_id.channel_id
                     elif isinstance(message.peer_id, PeerChat):
                         pid = message.peer_id.chat_id
-
-                    if pid in senders:
-                        sender = senders[pid]
-                    else:
-                        entity = await client.get_entity(pid)
-                        sender = await read_sender(client, entity)
                 else:
-                    if isinstance(message.peer_id, PeerChannel):
-                        pid = message.peer_id.channel_id
-                    elif isinstance(message.peer_id, PeerChat):
-                        pid = message.peer_id.chat_id
-                    elif isinstance(message.peer_id, PeerUser):
-                        pid = message.peer_id.user_id
+                    if isinstance(message.from_id, PeerChannel):
+                        pid = message.from_id.channel_id
+                    elif isinstance(message.from_id, PeerChat):
+                        pid = message.from_id.chat_id
+                    elif isinstance(message.from_id, PeerUser):
+                        pid = message.from_id.user_id
+
+                if pid in senders:
                     sender = senders[pid]
+                else:
+                    entity = await client.get_entity(pid)
+                    sender = await read_sender(client, entity)
+
+                print(f"-- reading message -> {total_messages_read}")
 
                 event = await read_message(client, message, sender)
                 new_events.append(event)
@@ -194,6 +199,8 @@ async def get_channel_messages(
                 total_messages_read += 1
 
             offset_id = messages.messages[-1].id  # Update offset_id to the last message ID
+
+            print(f"-- offset-id {offset_id}")
 
             # simpan ke webhook
             section_webhook = "group_messages"
@@ -208,6 +215,8 @@ async def get_channel_messages(
                 remaining_limit -= len(messages.messages)
                 if remaining_limit <= 0:
                     break
+
+            print(f"-- remaining {remaining_limit} messages")
 
             time.sleep(5)
 
