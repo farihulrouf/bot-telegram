@@ -197,8 +197,9 @@ async def get_channel_messages(
 
                 # result.append(event)
                 total_messages_read += 1
+                offset_id = message.id
 
-            offset_id = messages.messages[-1].id  # Update offset_id to the last message ID
+            # offset_id = messages.messages[-1].id  # Update offset_id to the last message ID
 
             print(f"-- offset-id {offset_id}")
 
