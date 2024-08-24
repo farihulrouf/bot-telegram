@@ -165,10 +165,9 @@ async def get_channel_messages(
             for message in messages.messages:
                 
                 sender = None
+                pid = None
 
                 if message.from_id == None:
-                    pid = None
-                    
                     if isinstance(message.peer_id, PeerChannel):
                         pid = message.peer_id.channel_id
                     elif isinstance(message.peer_id, PeerChat):
@@ -179,7 +178,10 @@ async def get_channel_messages(
                     else:
                         entity = await client.get_entity(pid)
                         sender = await read_sender(client, entity)
-                    
+                else:
+                    pid = message.from_id.user_id
+                    sender = senders[pid]
+
                 event = await read_message(client, message, sender)
                 new_events.append(event)
 
