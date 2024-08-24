@@ -62,7 +62,7 @@ async def login(phone: PhoneNumber):
     except Exception as e:
         # if client:
         #     await client.disconnect()
-        raise Exception(f"Failed to send code: {str(e)}")
+        raise Exception(f"Failed to login: {str(e)}")
 
 async def verify(code: VerificationCode):
     client = sessions.get(code.phone)
@@ -129,13 +129,13 @@ async def logout(phone: PhoneNumber):
                 except Exception as e:
                     return {"status": f"Task for phone {phone.phone} raised an exception: {str(e)}"}
         else:
-            logging.warning(f"No active session found for phone: {phone_number}")
+            logging.warning(f"No active session found for phone: {phone.phone}")
             return {"status": "no_active_session"}
         return {"status": "logout success"}
     except Exception as e:
         # if client:
         #     await client.disconnect()
-        raise Exception(f"Failed to send code: {str(e)}")
+        raise Exception(f"Failed to logout: {str(e)}")
 
 async def status(phone: PhoneNumber):
     client = sessions.get(phone.phone)
@@ -152,7 +152,7 @@ async def status(phone: PhoneNumber):
     except Exception as e:
         # if client:
         #     await client.disconnect()
-        raise Exception(f"Failed to send code: {str(e)}")
+        raise Exception(f"Failed to get status: {str(e)}")
 
 def process_bytes_in_dict(data):
     for key, value in data.items():
