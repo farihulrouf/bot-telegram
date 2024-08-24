@@ -103,8 +103,7 @@ async def get_group_search(background_tasks: BackgroundTasks, request: GroupSear
 @router.get("/api/devices")
 async def get_devices(query: str | None = Query(default=None),):
     try:
-        # background_tasks.add_task(telegram_controller.group_search, request.phone, request.query)
-        return {"status": "success", "data": sessions}
+        return telegram_controller.list_devices(query)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

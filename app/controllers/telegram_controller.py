@@ -33,6 +33,16 @@ SFTP_USERNAME = os.getenv('SFTP_USERNAME')
 SSH_KEY_PATH = os.getenv('SSH_KEY_PATH')
 PASSPHRASE = os.getenv('PASSPHRASE')
 
+def list_devices(query):
+    devices = []
+    for v,c in sessions.items():
+        if query == None or query in v:
+            devices.append(v)
+    return {
+        "status": "success",
+        "data": devices
+    }
+
 async def send_message(phone: str, recipient: str, message: str):
     client = sessions.get(phone)
     if not client:
@@ -140,14 +150,14 @@ async def logout(phone: PhoneNumber):
                     # return {"status": f"Task for phone {phone.phone} raised an exception: {str(e)}"}
 
             return {
-                "status": "success"
+                "status": "success",
                 "message": f"client {phone.phone} probably completely removed"
             }
         else:
             logging.warning(f"No active session found for phone: {phone.phone}")
 
         return {
-            "status": "success"
+            "status": "success",
             "message": "no active client"
         }
 
