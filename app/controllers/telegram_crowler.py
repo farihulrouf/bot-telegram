@@ -187,8 +187,8 @@ async def get_channel_messages(
                 if pid in senders:
                     sender = senders[pid]
                 else:
-                    entity = await client.get_entity(pid)
-                    sender = await read_sender(client, entity)
+                    user = await client.get_entity(pid)
+                    sender = await read_sender(client, user)
 
                 print(f"-- reading message -> {total_messages_read}")
 
