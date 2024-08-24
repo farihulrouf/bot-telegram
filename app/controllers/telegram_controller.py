@@ -60,8 +60,8 @@ async def login(phone: PhoneNumber):
         logging.debug(f"Session created and stored for phone: {phone.phone}")
         return {"status": "code_sent"}
     except Exception as e:
-        if client:
-            await client.disconnect()
+        # if client:
+        #     await client.disconnect()
         raise Exception(f"Failed to send code: {str(e)}")
 
 async def verify(code: VerificationCode):
@@ -133,8 +133,8 @@ async def logout(phone: PhoneNumber):
             return {"status": "no_active_session"}
         return {"status": "logout success"}
     except Exception as e:
-        if client:
-            await client.disconnect()
+        # if client:
+        #     await client.disconnect()
         raise Exception(f"Failed to send code: {str(e)}")
 
 async def status(phone: PhoneNumber):
@@ -150,8 +150,8 @@ async def status(phone: PhoneNumber):
 
         return {"status": status}
     except Exception as e:
-        if client:
-            await client.disconnect()
+        # if client:
+        #     await client.disconnect()
         raise Exception(f"Failed to send code: {str(e)}")
 
 def process_bytes_in_dict(data):
@@ -178,8 +178,8 @@ async def join_channel(channel_username, phone_number, client):
         print("The invite link is invalid.")
     except Exception as e:
         print(f"An error occurred: {e}")
-    finally:
-        await client.disconnect()
+    # finally:
+    #     await client.disconnect()
 
 async def join_subscribe(phone: str, username_channel: str):
     client = sessions.get(phone)
@@ -209,8 +209,8 @@ async def join_subscribe(phone: str, username_channel: str):
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         return {"status": "error", "message": str(e)}
-    finally:
-        await client.disconnect()
+    # finally:
+    #     await client.disconnect()
 
 async def channel_leave(phone: str, username_channel: str):
     client = sessions.get(phone)
@@ -239,8 +239,8 @@ async def channel_leave(phone: str, username_channel: str):
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         return {"status": "error", "message": str(e)}
-    finally:
-        await client.disconnect()
+    # finally:
+    #     await client.disconnect()
 
 async def group_search(phone: str, query: str):
     client = sessions.get(phone)
@@ -254,7 +254,7 @@ async def group_search(phone: str, query: str):
         result = await client(SearchRequest(q=query,limit=100))
 
         response = []
-        
+
         # takeout jika title tidak mengandung keyword
         for o in result.chats:
             # if query.lower() not in o.title.lower():
@@ -316,8 +316,8 @@ async def group_search(phone: str, query: str):
     except Exception as e:
         logging.error(f"An error occurred: {e}")
         return {"status": "error", "message": str(e)}
-    finally:
-        await client.disconnect()
+    # finally:
+    #     await client.disconnect()
 
 def extract_channel_names(text: str) -> ChannelNamesResponse:
     # Regular expression to find words starting with @
@@ -411,8 +411,8 @@ async def read_and_join_channels(phone: str, channel_username: str, limit: int =
 
     except Exception as e:
         raise Exception(f"Failed to read messages and join channels: {str(e)}")
-    finally:
-        await client.disconnect()
+    # finally:
+    #     await client.disconnect()
 
 
 async def get_channel_details(phone: str, channel_identifier: str):
@@ -433,7 +433,7 @@ async def get_channel_details(phone: str, channel_identifier: str):
                 entity_id = int(channel_identifier)
                 entity = await client.get_entity(entity_id)
             except Exception as e:
-                await client.disconnect()
+                # await client.disconnect()
                 raise Exception(f"Failed to fetch by ID: {str(e)}")
         elif channel_identifier.isdigit():
             # Treat as a positive ID
@@ -441,7 +441,7 @@ async def get_channel_details(phone: str, channel_identifier: str):
                 entity_id = int(channel_identifier)
                 entity = await client.get_entity(entity_id)
             except Exception as e:
-                await client.disconnect()
+                # await client.disconnect()
                 raise Exception(f"Failed to fetch by ID: {str(e)}")
         else:
             # Treat as a username
@@ -450,7 +450,7 @@ async def get_channel_details(phone: str, channel_identifier: str):
             try:
                 entity = await client.get_entity(channel_identifier)
             except Exception as e:
-                await client.disconnect()
+                # await client.disconnect()
                 raise Exception(f"Failed to fetch by username: {str(e)}")
 
         # Ensure that the entity is a valid Channel or Chat
@@ -469,15 +469,15 @@ async def get_channel_details(phone: str, channel_identifier: str):
                 "created_at": entity.date.isoformat() if entity.date else "Unknown"
             }
 
-            await client.disconnect()
+            # await client.disconnect()
             return {"status": "success", "channel_info": channel_info}
 
         else:
-            await client.disconnect()
+            # await client.disconnect()
             raise Exception("The identifier does not correspond to a channel or group.")
     
     except Exception as e:
-        await client.disconnect()
+        # await client.disconnect()
         raise Exception(f"Failed to get channel details: {str(e)}")
 
 async def get_all_contacts(phone: str):
@@ -502,11 +502,11 @@ async def get_all_contacts(phone: str):
             }
             contact_list.append(contact_info)
         
-        await client.disconnect()
+        # await client.disconnect()
         return {"status": "success", "contacts": contact_list}
 
     except Exception as e:
-        await client.disconnect()
+        # await client.disconnect()
         raise Exception(f"Failed to get contacts: {str(e)}")
 
 async def get_user_details(phone: str, username: str):
@@ -603,16 +603,16 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
             channels_groups=channels + groups
         )
 
-        await client.disconnect()
+        # await client.disconnect()
         logging.debug(f"Client disconnected for phone: {phone}")
 
         return response
 
     except ChannelsTooMuchError as e:
         logging.error(f"Failed to get channels: {str(e)}")
-        await client.disconnect()
+        # await client.disconnect()
         raise HTTPException(status_code=500, detail=f"Failed to get channels: {str(e)}")
     except Exception as e:
         logging.error(f"Failed to get channels and groups: {str(e)}")
-        await client.disconnect()
+        # await client.disconnect()
         raise HTTPException(status_code=500, detail=f"Failed to get channels and groups: {str(e)}")

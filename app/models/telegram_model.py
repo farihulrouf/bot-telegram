@@ -377,9 +377,9 @@ async def listen_messages(phone: str):
             await client.run_until_disconnected()
         except KeyboardInterrupt:
             print("Disconnected due to user interrupt")
-        finally:
-            await client.disconnect()
-    else:
-        await client.disconnect()
+        # finally:
+        #     await client.disconnect()
+    # else:
+    #     await client.disconnect()
 
     return {"status": "messages_received"}

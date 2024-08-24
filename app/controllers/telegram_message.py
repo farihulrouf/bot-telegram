@@ -126,8 +126,8 @@ async def read_all_messages(phone: str, channel_identifier: str, limit: Optional
     except Exception as e:
         logging.error(f"Failed to read messages: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to read messages: {str(e)}")
-    finally:
-        await client.disconnect()
+    # finally:
+    #     await client.disconnect()
 
 
 async def handle_media(message, channel_name):

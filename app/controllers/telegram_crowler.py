@@ -202,9 +202,9 @@ async def get_channel_messages(
                 if remaining_limit <= 0:
                     break
 
-        await client.disconnect()
+        # await client.disconnect()
         return {"status": "messages_received", "total_messages_read": total_messages_read}
 
     except Exception as e:
-        await client.disconnect()
+        # await client.disconnect()
         raise Exception(f"Failed to get messages: {str(e)}")
