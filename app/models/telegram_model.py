@@ -298,7 +298,7 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
                 await client.download_media(message.media, file=file_stream, progress_callback=report_progress)
                 mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
                 file_extension = mimetypes.guess_extension(mime_type) or 'bin'
-                file_name = f"{message.media.id}.{file_extension}"
+                file_name = f"{message.id}-{message.media.title}.{file_extension}"
 
             # Sanitize file name
             file_name = sanitize_filename(file_name)
