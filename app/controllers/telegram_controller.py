@@ -83,6 +83,9 @@ async def verify(code: VerificationCode):
 
             active_clients[code.phone] = asyncio.create_task(listen_messages(code.phone))
 
+            section_webhook = "update_bot_status"
+            await webhook_push(section_webhook, {"phone": code.phone})
+
             return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
 
         elif code.password:
@@ -93,6 +96,9 @@ async def verify(code: VerificationCode):
             logging.debug(f"User logged in with 2FA: {me}")
 
             active_clients[code.phone] = asyncio.create_task(listen_messages(code.phone))
+
+            section_webhook = "update_bot_status"
+            await webhook_push(section_webhook, {"phone": code.phone})
 
             return {"status": "logged_in", "user": jsonable_encoder(me_dict)}
 
@@ -117,6 +123,9 @@ async def logout(phone: PhoneNumber):
             await client.log_out()
             logging.debug(f"Successfully logged out for phone: {phone.phone}")
             del sessions[phone.phone]
+
+            section_webhook = "update_bot_status"
+            await webhook_push(section_webhook, {"phone": phone.phone})
 
             # remove task
             task = active_clients.pop(phone.phone, None)
