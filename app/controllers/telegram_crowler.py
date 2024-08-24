@@ -179,7 +179,12 @@ async def get_channel_messages(
                         entity = await client.get_entity(pid)
                         sender = await read_sender(client, entity)
                 else:
-                    pid = message.from_id.user_id
+                    if isinstance(message.peer_id, PeerChannel):
+                        pid = message.peer_id.channel_id
+                    elif isinstance(message.peer_id, PeerChat):
+                        pid = message.peer_id.chat_id
+                    elif isinstance(message.peer_id, PeerUser):
+                        pid = message.peer_id.user_id
                     sender = senders[pid]
 
                 event = await read_message(client, message, sender)
