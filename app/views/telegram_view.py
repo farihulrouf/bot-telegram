@@ -100,10 +100,30 @@ async def get_group_search(background_tasks: BackgroundTasks, request: GroupSear
         raise HTTPException(status_code=400, detail=str(e))
 
 # ok
+@router.get("/api/group/members", response_model=List[ContactResponse])
+async def get_all_contacts(phone: str = Query(...)):
+    try:
+        response = await telegram_controller.get_all_contacts(phone)
+        if response["status"] == "success":
+            return response["contacts"]
+        else:
+            raise HTTPException(status_code=400, detail="Failed to get contacts")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ok
 @router.get("/api/devices")
 async def get_devices(query: str | None = Query(default=None),):
     try:
         return telegram_controller.list_devices(query)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ok
+@router.get("/api/group/detail")
+async def get_group_detail(phone: str = Query(...), strid: str = Query(...)):
+    try:
+        return await telegram_controller.group_detail(phone,strid)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

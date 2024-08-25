@@ -123,7 +123,7 @@ def report_progress(transferred, total):
         sys.stdout.write('\rDownload Progress: |' + '-' * 40 + '| 0.00% | Speed: 0.00 KB/s')
         sys.stdout.flush()
 
-async def read_sender(client: TelegramClient, sender: Union[User, Channel, Chat]):
+async def read_sender(client: TelegramClient, sender: Union[User, Channel, Chat], group_id):
     
     original_id = sender.id
     username = sender.username
@@ -172,7 +172,8 @@ async def read_sender(client: TelegramClient, sender: Union[User, Channel, Chat]
         "is_private": is_private,
         "is_verified": is_private,
         "is_premium": is_premium,
-        "is_bot": is_bot
+        "is_bot": is_bot,
+        "group_id": group_id
     }
 
 
@@ -358,7 +359,13 @@ async def listen_messages(phone: str):
         if user.id in senders:
             sender = senders[user.id]
         else:
-            sender = await read_sender(client, user)
+            group_id = None
+            if isinstance(event.message.peer_id, PeerChannel):
+                group_id = event.message.peer_id.channel_id
+            elif isinstance(event.message.peer_id, PeerChat):
+                group_id = event.message.peer_id.chat_id
+
+            sender = await read_sender(client, user, group_id)
 
             section_webhook = "senders"
             await webhook_push(section_webhook, [sender])

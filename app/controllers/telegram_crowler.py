@@ -19,8 +19,6 @@ from dotenv import load_dotenv
 # Muat variabel lingkungan dari file .env
 load_dotenv()
 
-webhook_url = os.getenv('WEBHOOK_URL')
-
 # Set up logging
 #logging.basicConfig(level=logging.DEBUG)
 
@@ -154,7 +152,7 @@ async def get_channel_messages(
             new_senders = []
             for user in messages.users:
                 if not user.id in senders:
-                    sender = await read_sender(client, user)
+                    sender = await read_sender(client, user, group_id)
                     senders[user.id] = sender
                     new_senders.append(sender)
 
@@ -188,7 +186,7 @@ async def get_channel_messages(
                     sender = senders[pid]
                 else:
                     user = await client.get_entity(pid)
-                    sender = await read_sender(client, user)
+                    sender = await read_sender(client, user, group_id)
 
                 print(f"-- reading message -> {total_messages_read}")
 

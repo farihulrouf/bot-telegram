@@ -43,6 +43,31 @@ def list_devices(query):
         "data": devices
     }
 
+async def group_detail(phone: str, strid: str):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+
+    if not client.is_connected():
+        await client.connect()
+
+    try:
+        if strid.startswith('@'):
+            strid = strid[1:]
+        
+        eid = None
+        if strid.isdigit():
+            eid = int(strid)
+        else:
+            eid = strid
+
+        entity = await client.get_entity(eid)
+        print(entity)
+
+        return {"status": "success"}
+    except Exception as e:
+        raise Exception(f"Failed to send message: {str(e)}")
+
 async def send_message(phone: str, recipient: str, message: str):
     client = sessions.get(phone)
     if not client:
