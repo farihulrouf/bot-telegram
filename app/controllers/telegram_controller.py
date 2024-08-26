@@ -43,40 +43,16 @@ def list_devices(query):
         "data": devices
     }
 
-async def group_detail(phone: str, strid: str):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        if strid.startswith('@'):
-            strid = strid[1:]
-        
-        eid = None
-        if strid.isdigit():
-            eid = int(strid)
-        else:
-            eid = strid
-
-        entity = await client.get_entity(eid)
-        print(entity)
-
-        return {"status": "success"}
-    except Exception as e:
-        raise Exception(f"Failed to send message: {str(e)}")
 
 async def send_message(phone: str, recipient: str, message: str):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-
-    if not client.is_connected():
-        await client.connect()
-
     try:
+        client = sessions.get(phone)
+        if not client:
+            raise Exception("Session not found")
+
+        if not client.is_connected():
+            await client.connect()
+
         if recipient.startswith('@'):
             recipient = recipient[1:]
 
@@ -87,9 +63,9 @@ async def send_message(phone: str, recipient: str, message: str):
         raise Exception(f"Failed to send message: {str(e)}")
 
 async def login(phone: PhoneNumber):
-    client = create_client(phone.phone)
-    await client.connect()
     try:
+        client = create_client(phone.phone)
+        await client.connect()
         await client.send_code_request(phone.phone)
         sessions[phone.phone] = client
         logging.debug(f"Session created and stored for phone: {phone.phone}")
@@ -100,14 +76,14 @@ async def login(phone: PhoneNumber):
         raise Exception(f"Failed to login: {str(e)}")
 
 async def verify(code: VerificationCode):
-    client = sessions.get(code.phone)
-    if not client:
-        raise Exception("Session not found")
-
-    if not client.is_connected():
-        await client.connect()
-
     try:
+        client = sessions.get(code.phone)
+        if not client:
+            raise Exception("Session not found")
+
+        if not client.is_connected():
+            await client.connect()
+
         await client.sign_in(code.phone, code.code)
 
         if await client.is_user_authorized():
@@ -149,8 +125,8 @@ async def verify(code: VerificationCode):
         raise Exception(f"Failed to verify code: {str(e)}")
 
 async def logout(phone: PhoneNumber):
-    client = sessions.get(phone.phone)
     try:
+        client = None #sessions.get(phone.phone)
         if client:
             if not client.is_connected():
                 await client.connect()
@@ -164,25 +140,22 @@ async def logout(phone: PhoneNumber):
 
             # remove task
             task = active_clients.pop(phone.phone, None)
-            if not task is None:
+            if task:
                 task.cancel()
-                try:
-                    await task
-                # except asyncio.CancelledError:
-                #     return {"status": f"Task for phone {phone.phone} was cancelled"}
-                except Exception as e:
-                    None
-                    # return {"status": f"Task for phone {phone.phone} raised an exception: {str(e)}"}
+                # try:
+                #     await task
+                # except Exception as e:
+                #     None
 
             return {
                 "status": "success",
                 "message": f"client {phone.phone} probably completely removed"
             }
-        else:
-            logging.warning(f"No active session found for phone: {phone.phone}")
+        # else:
+        #     logging.warning(f"No active session found for phone: {phone.phone}")
 
         return {
-            "status": "success",
+            "status": "error",
             "message": "no active client"
         }
 
@@ -192,8 +165,8 @@ async def logout(phone: PhoneNumber):
         raise Exception(f"Failed to logout: {str(e)}")
 
 async def status(phone: PhoneNumber):
-    client = sessions.get(phone.phone)
     try:
+        client = sessions.get(phone.phone)
         status = 0
         if client:
             if client.is_connected():
@@ -235,143 +208,6 @@ async def join_channel(channel_username, phone_number, client):
     # finally:
     #     await client.disconnect()
 
-async def join_subscribe(phone: str, username_channel: str):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-    
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        if username_channel.startswith('@'):
-            username_channel = username_channel[1:]
-
-        # Bergabung dengan saluran
-        await client(JoinChannelRequest(username_channel))
-        logging.debug(f"Successfully joined the channel: {username_channel}")
-        return {"status": "joined_channel", "channel": username_channel}
-    except FloodWaitError as e:
-        logging.error(f"Must wait for {e.seconds} seconds before trying again.")
-        return {"status": "flood_wait", "seconds": e.seconds}
-    except InviteHashExpiredError:
-        logging.error("The invite link has expired.")
-        return {"status": "invite_link_expired"}
-    except InviteHashInvalidError:
-        logging.error("The invite link is invalid.")
-        return {"status": "invite_link_invalid"}
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return {"status": "error", "message": str(e)}
-    # finally:
-    #     await client.disconnect()
-
-async def channel_leave(phone: str, username_channel: str):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-    
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        if username_channel.startswith('@'):
-            username_channel = username_channel[1:]
-
-        await client(LeaveChannelRequest(username_channel))
-        logging.debug(f"Successfully leave the channel: {username_channel}")
-        return {"status": "leave_channel", "channel": username_channel}
-    except FloodWaitError as e:
-        logging.error(f"Must wait for {e.seconds} seconds before trying again.")
-        return {"status": "flood_wait", "seconds": e.seconds}
-    except InviteHashExpiredError:
-        logging.error("The invite link has expired.")
-        return {"status": "invite_link_expired"}
-    except InviteHashInvalidError:
-        logging.error("The invite link is invalid.")
-        return {"status": "invite_link_invalid"}
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return {"status": "error", "message": str(e)}
-    # finally:
-    #     await client.disconnect()
-
-async def group_search(phone: str, query: str):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-    
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        result = await client(SearchRequest(q=query,limit=100))
-
-        response = []
-
-        # takeout jika title tidak mengandung keyword
-        for o in result.chats:
-            # if query.lower() not in o.title.lower():
-            #     continue
-
-            time.sleep(3)
-            messages = await client.get_messages(o, limit=1) #pass your own args
-
-            ctype = "group"
-            if isinstance(o,Channel):
-                ctype = "channel"
-
-            # need to download
-            # photo=ChatPhoto(photo_id=5771857011674299893
-
-            response.append({
-                'name' : (o.title.encode("ascii", "ignore")).decode(),
-                'original_id' : o.id,
-                'username' : o.username,
-                'created_at' : int(o.date.timestamp()),
-                'type' : ctype,
-                'members' : o.participants_count,
-                'chats' : messages.total,
-                'access_hash' : o.access_hash
-            })
-    
-        # # ambil data users
-        # for o in result.users:
-        #     name = o.first_name if str(o.last_name) == 'None' else o.first_name +' '+ o.last_name
-        #     response.append({
-        #         'name' : (name.encode("ascii", "ignore")).decode(),
-        #         'original_id' : o.id,
-        #         'username' : o.username,
-        #         'created_at' : '',
-        #         'type' : 'user',
-        #         'members' : 0,
-        #         'chats' : 0,
-        #         'access_hash' : o.access_hash
-        #     })
-
-        section_webhook = "group_search"
-        await webhook_push(section_webhook, {
-            "query": query,
-            "data": response
-        })
-        
-        logging.debug(f"Successfully search group: {query}")
-
-        return {"status": "success", "query": query, "data": response}
-    except FloodWaitError as e:
-        logging.error(f"Must wait for {e.seconds} seconds before trying again.")
-        return {"status": "flood_wait", "seconds": e.seconds}
-    except InviteHashExpiredError:
-        logging.error("The invite link has expired.")
-        return {"status": "invite_link_expired"}
-    except InviteHashInvalidError:
-        logging.error("The invite link is invalid.")
-        return {"status": "invite_link_invalid"}
-    except Exception as e:
-        logging.error(f"An error occurred: {e}")
-        return {"status": "error", "message": str(e)}
-    # finally:
-    #     await client.disconnect()
 
 def extract_channel_names(text: str) -> ChannelNamesResponse:
     # Regular expression to find words starting with @

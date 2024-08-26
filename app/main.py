@@ -11,11 +11,11 @@ app.include_router(telegram_view.router)
 
 @app.on_event("startup")
 async def startup_event():
-    None
     # Mulai mendengarkan pesan untuk setiap nomor telepon di sessions
     for phone, client in sessions.items():
-        # Mulai mendengarkan pesan
-        active_clients[phone] = asyncio.create_task(listen_messages(phone))
+    #     # Mulai mendengarkan pesan
+    #     active_clients[phone] = asyncio.create_task(listen_messages(phone))
+        None
 
 if __name__ == "__main__":
     import uvicorn
