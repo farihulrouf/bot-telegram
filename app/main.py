@@ -14,8 +14,7 @@ async def startup_event():
     # Mulai mendengarkan pesan untuk setiap nomor telepon di sessions
     for phone, client in sessions.items():
     #     # Mulai mendengarkan pesan
-    #     active_clients[phone] = asyncio.create_task(listen_messages(phone))
-        None
+        active_clients[phone] = asyncio.create_task(listen_messages(phone))
 
 if __name__ == "__main__":
     import uvicorn
