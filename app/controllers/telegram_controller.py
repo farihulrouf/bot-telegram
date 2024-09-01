@@ -142,10 +142,10 @@ async def logout(phone: PhoneNumber):
             task = active_clients.pop(phone.phone, None)
             if task:
                 task.cancel()
-                try:
-                    await task
-                except Exception as e:
-                    None
+                # try:
+                #     await task
+                # except Exception as e:
+                #     None
 
             return {
                 "status": "success",
