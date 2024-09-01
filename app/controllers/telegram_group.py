@@ -14,6 +14,7 @@ from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 from telethon.tl.types import PeerUser, PeerChat, PeerChannel, User, Channel, Chat
 from fastapi.encoders import jsonable_encoder
 from app.controllers.webhook import webhook_push
+from app.utils.utils import upload_profile_avatar, upload_post_media
 from typing import Optional
 import asyncio
 import base64
@@ -50,7 +51,7 @@ async def detail(phone: str, strid: str):
             eid = strid
 
         entity = await client.get_entity(eid)
-        print(entity)
+        # print(entity)
 
         # channel_info = {
         #         "id": entity.id,
@@ -63,7 +64,35 @@ async def detail(phone: str, strid: str):
         #         "created_at": entity.date.isoformat() if entity.date else "Unknown"
         #     }
 
-        return {"status": "success"}
+        # Channel(
+        #     id=1976881783, 
+        #     title='Grup ASN UNTAD Palu Sulteng',
+        #     photo=ChatPhotoEmpty(),
+        #     date=datetime.datetime(2023, 9, 30, 2, 26, 47, tzinfo=datetime.timezone.utc), 
+        #     creator=False, left=True, broadcast=False, 
+        #     verified=False, megagroup=True, 
+        #     restricted=False, signatures=False, min=False, 
+        #     scam=False, has_link=False, has_geo=False, 
+        #     slowmode_enabled=False, call_active=False, call_not_empty=False, 
+        #     fake=False, gigagroup=False, noforwards=False, 
+        #     join_to_send=False, join_request=False, forum=False, 
+        #     stories_hidden=False, stories_hidden_min=True, 
+        #     stories_unavailable=True, access_hash=-534482594599969747, 
+        #     username='ASN_UNTAD_Palu_Sulteng', restriction_reason=[], 
+        #     admin_rights=None, banned_rights=None, 
+        #     default_banned_rights=ChatBannedRights(until_date=datetime.datetime(2038, 1, 19, 3, 14, 7, tzinfo=datetime.timezone.utc), 
+        #     view_messages=False, send_messages=False, send_media=False, 
+        #     send_stickers=False, send_gifs=False, send_games=False, 
+        #     send_inline=False, embed_links=False, send_polls=False, 
+        #     change_info=True, invite_users=False, pin_messages=True, 
+        #     manage_topics=False, send_photos=False, send_videos=False, 
+        #     send_roundvideos=False, send_audios=False, send_voices=False, 
+        #     send_docs=False, send_plain=False), participants_count=None, 
+        #     usernames=[], stories_max_id=None, color=None, profile_color=None, 
+        #     emoji_status=None, level=None
+        # )
+
+        return {"status": "success", "data": entity}
     except Exception as e:
         raise Exception(f"Failed to send message: {str(e)}")
 
@@ -82,8 +111,53 @@ async def join(phone: str, username_channel: str):
 
         # Bergabung dengan saluran
         await client(JoinChannelRequest(username_channel))
+        entity = await client.get_entity(username_channel)
+
+        ctype = "group"
+        if isinstance(entity,Channel):
+            ctype = "channel"
+
+        avatar = ""
+        if entity.photo != None:    
+            file_stream = io.BytesIO()
+            result = await client.download_profile_photo(entity, file=file_stream)
+            if result:
+                file_stream.seek(0)
+                avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg")
+
+        response = []
+        response.append({
+            'name' : (entity.title.encode("ascii", "ignore")).decode(),
+            'original_id' : entity.id,
+            'username' : entity.username,
+            'avatar' : avatar,
+            'url': "https://t.me/"+ entity.username,
+            'created_at' : int(entity.date.timestamp()),
+            'type' : ctype,
+            'members' : entity.participants_count,
+            'chats' : None,
+            'access_hash' : entity.access_hash
+        })
+
+        section_webhook = "group_search"
+        await webhook_push(section_webhook, {
+            "query": "",
+            "data": response
+        })
+
+        # channel_info = {
+        #         "id": entity.id,
+        #         "name": entity.title or "No Title",
+        #         "username": entity.username or "No Username",
+        #         "participants_count": full_channel.full_chat.participants_count or 0,
+        #         "admins_count": full_channel.full_chat.admins_count or 0,
+        #         "banned_count": full_channel.full_chat.kicked_count or 0,
+        #         "description": full_channel.full_chat.about or "",
+        #         "created_at": entity.date.isoformat() if entity.date else "Unknown"
+        #     }
+
         logging.debug(f"Successfully joined the channel: {username_channel}")
-        return {"status": "joined_channel", "channel": username_channel}
+        return {"status": "success", "data": response}
     except FloodWaitError as e:
         logging.error(f"Must wait for {e.seconds} seconds before trying again.")
         return {"status": "flood_wait", "seconds": e.seconds}
@@ -112,7 +186,7 @@ async def leave(phone: str, username_channel: str):
 
         await client(LeaveChannelRequest(username_channel))
         logging.debug(f"Successfully leave the channel: {username_channel}")
-        return {"status": "leave_channel", "channel": username_channel}
+        return {"status": "success", "channel": username_channel}
     except FloodWaitError as e:
         logging.error(f"Must wait for {e.seconds} seconds before trying again.")
         return {"status": "flood_wait", "seconds": e.seconds}
@@ -154,11 +228,20 @@ async def search(phone: str, query: str):
 
             # need to download
             # photo=ChatPhoto(photo_id=5771857011674299893
+            avatar = ""
+            if o.photo != None:    
+                file_stream = io.BytesIO()
+                result = await client.download_profile_photo(o, file=file_stream)
+                if result:
+                    file_stream.seek(0)
+                    avatar = upload_profile_avatar(file_stream, f"{o.id}-jpg")
 
             response.append({
                 'name' : (o.title.encode("ascii", "ignore")).decode(),
                 'original_id' : o.id,
                 'username' : o.username,
+                'avatar' : avatar,
+                'url': "https://t.me/"+ o.username,
                 'created_at' : int(o.date.timestamp()),
                 'type' : ctype,
                 'members' : o.participants_count,
