@@ -126,7 +126,7 @@ async def verify(code: VerificationCode):
 
 async def logout(phone: PhoneNumber):
     try:
-        client = None #sessions.get(phone.phone)
+        client = sessions.get(phone.phone)
         if client:
             if not client.is_connected():
                 await client.connect()
@@ -142,10 +142,10 @@ async def logout(phone: PhoneNumber):
             task = active_clients.pop(phone.phone, None)
             if task:
                 task.cancel()
-                # try:
-                #     await task
-                # except Exception as e:
-                #     None
+                try:
+                    await task
+                except Exception as e:
+                    None
 
             return {
                 "status": "success",
