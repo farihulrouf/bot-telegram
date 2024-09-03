@@ -158,7 +158,7 @@ async def read_sender(client: TelegramClient, sender: Union[User, Channel, Chat]
         result = await client.download_profile_photo(sender, file=file_stream)
         if result:
             file_stream.seek(0)
-            avatar = upload_profile_avatar(file_stream, f"{original_id}-jpg")
+            avatar = upload_profile_avatar(file_stream, f"{original_id}-jpg", "image/jpg")
 
     return {
         "original_id": original_id,
@@ -276,6 +276,7 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
             file_name = ''
             file_extension = ''
             remote_file_path = ''
+            mime_type = ''
 
             global start_time
             start_time = time.time()
@@ -284,6 +285,7 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
                 logging.debug(f"Downloading photo media from message ID: {message.id}")
                 await client.download_media(message.media.photo, file=file_stream, progress_callback=report_progress)
                 file_extension = 'jpg'
+                mime_type = doc.mime_type
                 file_name = next((attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), f"photo_{message.id}.{file_extension}")
 
             elif isinstance(message.media, MessageMediaDocument):
@@ -308,14 +310,6 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
             logging.debug(f"Uploading file with name: {file_name}")
             # uploaded_file_url = upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secret_key, endpoint, bucket, folder)
 
-            date_folder = message.date.strftime('%Y%m%d')
-            uploaded_file_url = upload_post_media(file_stream, group_id, date_folder, file_name)
-                         
-            logging.debug(f"Uploaded file URL: {uploaded_file_url}")
-                            
-            if not uploaded_file_url:
-                raise Exception("File upload returned an invalid URL.")
-
             mime_type = mimetypes.guess_type(file_name)[0]
             media_type = "document"
             if mime_type:
@@ -334,6 +328,16 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
             message_data["file_type"] = media_type
             message_data["file_name"] = file_name
             message_data["file_url"] = uploaded_file_url
+
+            date_folder = message.date.strftime('%Y%m%d')
+            uploaded_file_url = upload_post_media(file_stream, group_id, date_folder, file_name, mime_type)
+                         
+            logging.debug(f"Uploaded file URL: {uploaded_file_url}")
+                            
+            if not uploaded_file_url:
+                raise Exception("File upload returned an invalid URL.")
+
+            
 
         except Exception as e:
             logging.error(f"Error downloading or uploading media: {e}")

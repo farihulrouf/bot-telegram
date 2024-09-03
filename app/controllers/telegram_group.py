@@ -98,7 +98,7 @@ async def detail(phone: str, strid: str):
             result = await client.download_profile_photo(entity, file=file_stream)
             if result:
                 file_stream.seek(0)
-                avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg")
+                avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg", "image/jpg")
 
         response = {
             'name' : (entity.title.encode("ascii", "ignore")).decode(),
@@ -270,7 +270,7 @@ async def search(phone: str, query: str):
                 result = await client.download_profile_photo(o, file=file_stream)
                 if result:
                     file_stream.seek(0)
-                    avatar = upload_profile_avatar(file_stream, f"{o.id}-jpg")
+                    avatar = upload_profile_avatar(file_stream, f"{o.id}-jpg", "image/jpg")
 
             response.append({
                 'name' : (o.title.encode("ascii", "ignore")).decode(),
