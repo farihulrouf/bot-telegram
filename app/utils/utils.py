@@ -30,7 +30,7 @@ def upload_file_to_spaces(file_stream, file_name, channel_name, access_key, secr
         path = f"{folder}/{channel_name}/{file_name}"
 
         # Upload file with public-read ACL
-        client.upload_fileobj(file_stream, bucket, path, ExtraArgs={'ACL': 'public-read'})
+        client.upload_fileobj(file_stream, bucket, path, ExtraArgs={'ACL': 'public-read', 'ContentDisposition': 'inline'})
         logging.info(f"File uploaded successfully to DigitalOcean Spaces: {path}")
 
         # Construct file URL
@@ -59,7 +59,7 @@ def upload_profile_avatar(file_stream, filename):
         path = f"media/tg/a/{filename}"
 
         # Upload file with public-read ACL
-        client.upload_fileobj(file_stream, space_bucket, path, ExtraArgs={'ACL': 'public-read'})
+        client.upload_fileobj(file_stream, space_bucket, path, ExtraArgs={'ACL': 'public-read', 'ContentDisposition': 'inline'})
         logging.info(f"File uploaded successfully to DigitalOcean Spaces: {path}")
 
         # Construct file URL
@@ -89,7 +89,7 @@ def upload_post_media(file_stream, group_id, date_folder, filename):
         path = f"media/tg/p/{group_id}/{date_folder}/{filename}"
 
         # Upload file with public-read ACL
-        client.upload_fileobj(file_stream, space_bucket, path, ExtraArgs={'ACL': 'public-read'})
+        client.upload_fileobj(file_stream, space_bucket, path, ExtraArgs={'ACL': 'public-read', 'ContentDisposition': 'inline'})
         logging.info(f"File uploaded successfully to DigitalOcean Spaces: {path}")
 
         # Construct file URL

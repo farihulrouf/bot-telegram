@@ -128,9 +128,15 @@ async def detail(phone: str, strid: str):
 
 
 async def join(phone: str, username_channel: str):
+    client = sessions.get(phone)
+    if not client:
+        raise Exception("Session not found")
+
+    if not client.is_connected():
+        await client.connect()
     try:
-        # if username_channel.startswith('@'):
-        #     username_channel = username_channel[1:]
+        if username_channel.startswith('@'):
+            username_channel = username_channel[1:]
 
         # # Bergabung dengan saluran
         # await client(JoinChannelRequest(username_channel))
@@ -184,7 +190,7 @@ async def join(phone: str, username_channel: str):
         ret = await detail(phone, username_channel)
 
         await client(JoinChannelRequest(username_channel))
-        
+
         response = ret["data"]
 
         return {"status": "success", "data": response}
