@@ -4,7 +4,7 @@ from telethon import TelegramClient, events, utils, errors
 from telethon.tl.types import PeerChannel, ChatPhoto, UserProfilePhoto, ChannelFull, InputPhoneContact, InputUser, ChannelParticipantsSearch
 from telethon.tl.functions.contacts import GetContactsRequest, SearchRequest
 from telethon.tl.functions.users import GetFullUserRequest
-from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest
+from telethon.tl.functions.messages import GetHistoryRequest, GetFullChatRequest, GetChatsRequest
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, ChannelNamesResponse, ChannelNamesResponseAll, ChannelDetailResponse
 from app.models.telegram_model import active_clients, listen_messages, read_sender, read_message
 from telethon.tl.types import Channel, Chat, MessageMediaPhoto, MessageMediaDocument, MessageMediaUnsupported
@@ -51,71 +51,46 @@ async def detail(phone: str, strid: str):
             eid = strid
 
         entity = await client.get_entity(eid)
-        # print(entity)
 
-        # channel_info = {
-        #         "id": entity.id,
-        #         "name": entity.title or "No Title",
-        #         "username": entity.username or "No Username",
-        #         "participants_count": full_channel.full_chat.participants_count or 0,
-        #         "admins_count": full_channel.full_chat.admins_count or 0,
-        #         "banned_count": full_channel.full_chat.kicked_count or 0,
-        #         "description": full_channel.full_chat.about or "",
-        #         "created_at": entity.date.isoformat() if entity.date else "Unknown"
-        #     }
-
-        # Channel(
-        #     id=1976881783, 
-        #     title='Grup ASN UNTAD Palu Sulteng',
-        #     photo=ChatPhotoEmpty(),
-        #     date=datetime.datetime(2023, 9, 30, 2, 26, 47, tzinfo=datetime.timezone.utc), 
-        #     creator=False, left=True, broadcast=False, 
-        #     verified=False, megagroup=True, 
-        #     restricted=False, signatures=False, min=False, 
-        #     scam=False, has_link=False, has_geo=False, 
-        #     slowmode_enabled=False, call_active=False, call_not_empty=False, 
-        #     fake=False, gigagroup=False, noforwards=False, 
-        #     join_to_send=False, join_request=False, forum=False, 
-        #     stories_hidden=False, stories_hidden_min=True, 
-        #     stories_unavailable=True, access_hash=-534482594599969747, 
-        #     username='ASN_UNTAD_Palu_Sulteng', restriction_reason=[], 
-        #     admin_rights=None, banned_rights=None, 
-        #     default_banned_rights=ChatBannedRights(until_date=datetime.datetime(2038, 1, 19, 3, 14, 7, tzinfo=datetime.timezone.utc), 
-        #     view_messages=False, send_messages=False, send_media=False, 
-        #     send_stickers=False, send_gifs=False, send_games=False, 
-        #     send_inline=False, embed_links=False, send_polls=False, 
-        #     change_info=True, invite_users=False, pin_messages=True, 
-        #     manage_topics=False, send_photos=False, send_videos=False, 
-        #     send_roundvideos=False, send_audios=False, send_voices=False, 
-        #     send_docs=False, send_plain=False), participants_count=None, 
-        #     usernames=[], stories_max_id=None, color=None, profile_color=None, 
-        #     emoji_status=None, level=None
-        # )
-
-        return {"status": "success", "data": entity}
-    except Exception as e:
-        raise Exception(f"Failed to send message: {str(e)}")
-
-
-async def join(phone: str, username_channel: str):
-    client = sessions.get(phone)
-    if not client:
-        raise Exception("Session not found")
-    
-    if not client.is_connected():
-        await client.connect()
-
-    try:
-        if username_channel.startswith('@'):
-            username_channel = username_channel[1:]
-
-        # Bergabung dengan saluran
-        await client(JoinChannelRequest(username_channel))
-        entity = await client.get_entity(username_channel)
-
+        new_senders = []
+        members_count = None
+        description = None
         ctype = "group"
-        if isinstance(entity,Channel):
+
+        if isinstance(entity, Chat):
+            full_chat = await client(GetFullChatRequest(entity.id))
+            # print(full_chat)
+            members_count = full_chat.full_chat.participants_count
+            description = full_chat.full_chat.about
+            ctype = "group"
+
+            # for chat in full_chat.chats:
+            #     print(f"Chat ID: {chat.id}, Title: {chat.title}")
+
+            # for user in full_chat.users:
+            #     print(f"User ID: {user.id}, Username: {user.username}, First Name: {user.first_name}")
+
+            for user in full_chat.users:
+                sender = await read_sender(client, user, entity.id)
+                new_senders.append(sender)
+
+
+        elif isinstance(entity, Channel):
+            full_channel = await client(GetFullChannelRequest(entity.id))
+            # print(full_channel)
+            members_count = full_channel.full_chat.participants_count
+            description = full_channel.full_chat.about
             ctype = "channel"
+
+            # for chat in full_channel.chats:
+            #     print(f"Chat ID: {chat.id}, Title: {chat.title}")
+
+            # for user in full_channel.users:
+            #     print(f"User ID: {user.id}, Username: {user.username}, First Name: {user.first_name}")
+
+            for user in full_channel.users:
+                sender = await read_sender(client, user, entity.id)
+                new_senders.append(sender)
 
         avatar = ""
         if entity.photo != None:    
@@ -125,25 +100,73 @@ async def join(phone: str, username_channel: str):
                 file_stream.seek(0)
                 avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg")
 
-        response = []
-        response.append({
+        response = {
             'name' : (entity.title.encode("ascii", "ignore")).decode(),
+            'description': description,
             'original_id' : entity.id,
             'username' : entity.username,
             'avatar' : avatar,
             'url': "https://t.me/"+ entity.username,
             'created_at' : int(entity.date.timestamp()),
             'type' : ctype,
-            'members' : entity.participants_count,
+            'members' : members_count,
             'chats' : None,
             'access_hash' : entity.access_hash
-        })
+        }
 
-        section_webhook = "group_search"
-        await webhook_push(section_webhook, {
-            "query": "",
-            "data": response
-        })
+        # simpan ke webhook
+        section_webhook = "group_info"
+        await webhook_push(section_webhook, response)
+
+        section_webhook = "senders"
+        await webhook_push(section_webhook, new_senders)
+
+        return {"status": "success", "data": response}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+        # raise Exception(f"Failed to send message: {str(e)}")
+
+
+async def join(phone: str, username_channel: str):
+    try:
+        # if username_channel.startswith('@'):
+        #     username_channel = username_channel[1:]
+
+        # # Bergabung dengan saluran
+        # await client(JoinChannelRequest(username_channel))
+        # entity = await client.get_entity(username_channel)
+
+        # ctype = "group"
+        # if isinstance(entity,Channel):
+        #     ctype = "channel"
+
+        # avatar = ""
+        # if entity.photo != None:    
+        #     file_stream = io.BytesIO()
+        #     result = await client.download_profile_photo(entity, file=file_stream)
+        #     if result:
+        #         file_stream.seek(0)
+        #         avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg")
+
+        # response = []
+        # response.append({
+        #     'name' : (entity.title.encode("ascii", "ignore")).decode(),
+        #     'original_id' : entity.id,
+        #     'username' : entity.username,
+        #     'avatar' : avatar,
+        #     'url': "https://t.me/"+ entity.username,
+        #     'created_at' : int(entity.date.timestamp()),
+        #     'type' : ctype,
+        #     'members' : entity.participants_count,
+        #     'chats' : None,
+        #     'access_hash' : entity.access_hash
+        # })
+
+        # section_webhook = "group_search"
+        # await webhook_push(section_webhook, {
+        #     "query": "",
+        #     "data": response
+        # })
 
         # channel_info = {
         #         "id": entity.id,
@@ -156,7 +179,14 @@ async def join(phone: str, username_channel: str):
         #         "created_at": entity.date.isoformat() if entity.date else "Unknown"
         #     }
 
-        logging.debug(f"Successfully joined the channel: {username_channel}")
+        # logging.debug(f"Successfully joined the channel: {username_channel}")
+
+        ret = await detail(phone, username_channel)
+
+        await client(JoinChannelRequest(username_channel))
+        
+        response = ret["data"]
+
         return {"status": "success", "data": response}
     except FloodWaitError as e:
         logging.error(f"Must wait for {e.seconds} seconds before trying again.")

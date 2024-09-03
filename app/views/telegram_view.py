@@ -104,18 +104,18 @@ async def get_group_members(
         raise HTTPException(status_code=400, detail=str(e))
 
 # ok
-@router.get("/api/devices")
-async def get_devices(query: str | None = Query(default=None),):
-    try:
-        return telegram_controller.list_devices(query)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-# ok
 @router.get("/api/group/detail")
 async def get_group_detail(phone: str = Query(...), strid: str = Query(...)):
     try:
         return await telegram_group.detail(phone,strid)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ok
+@router.get("/api/devices")
+async def get_devices(query: str | None = Query(default=None),):
+    try:
+        return telegram_controller.list_devices(query)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
