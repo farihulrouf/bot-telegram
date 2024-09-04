@@ -296,19 +296,19 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
                 file_name = next((attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), f"photo_{message.id}.{file_extension}")
 
             elif isinstance(message.media, MessageMediaDocument):
-                doc = message.media.document
                 logging.debug(f"Downloading document media from message ID: {message.id}")
-                await client.download_media(doc, file=file_stream, progress_callback=report_progress)
-                mime_type = doc.mime_type
-                file_extension = mimetypes.guess_extension(mime_type) or '.bin'
-                file_name = next((attr.file_name for attr in doc.attributes if hasattr(attr, 'file_name')), f"{message.id}{file_extension}")
+                # doc = message.media.document
+                # await client.download_media(doc, file=file_stream, progress_callback=report_progress)
+                # mime_type = doc.mime_type
+                # file_extension = mimetypes.guess_extension(mime_type) or '.bin'
+                # file_name = next((attr.file_name for attr in doc.attributes if hasattr(attr, 'file_name')), f"{message.id}{file_extension}")
 
             else:
                 logging.debug(f"Downloading other media from message ID: {message.id}")
-                await client.download_media(message.media, file=file_stream, progress_callback=report_progress)
-                mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
-                file_extension = mimetypes.guess_extension(mime_type) or 'bin'
-                file_name = f"{message.id}-{message_data['time']}.{file_extension}"
+                # await client.download_media(message.media, file=file_stream, progress_callback=report_progress)
+                # mime_type = message.media.mime_type if hasattr(message.media, 'mime_type') else 'application/octet-stream'
+                # file_extension = mimetypes.guess_extension(mime_type) or 'bin'
+                # file_name = f"{message.id}-{message_data['time']}.{file_extension}"
 
             # Sanitize file name
             file_name = sanitize_filename(file_name)
