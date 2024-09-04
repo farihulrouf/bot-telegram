@@ -281,11 +281,15 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
             global start_time
             start_time = time.time()
 
+            # print("---------- message media -----------")
+            # print(message.media)
+
             if isinstance(message.media, MessageMediaPhoto):
                 logging.debug(f"Downloading photo media from message ID: {message.id}")
-                await client.download_media(message.media.photo, file=file_stream, progress_callback=report_progress)
+                file_path = await client.download_media(message.media.photo, file=file_stream, progress_callback=report_progress)
                 file_extension = 'jpg'
-                mime_type = doc.mime_type
+                # mimetypes.guess_type(file_path)
+                mime_type = "image/jpg"
                 file_name = next((attr.file_name for attr in message.media.photo.sizes if hasattr(attr, 'file_name')), f"photo_{message.id}.{file_extension}")
 
             elif isinstance(message.media, MessageMediaDocument):
@@ -324,14 +328,14 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
                 else:
                     media_type = "file"
 
+            date_folder = message.date.strftime('%Y%m%d')
+            uploaded_file_url = upload_post_media(file_stream, group_id, date_folder, file_name, mime_type)
+
             message_data["mimetype"] = mime_type
             message_data["file_type"] = media_type
             message_data["file_name"] = file_name
             message_data["file_url"] = uploaded_file_url
 
-            date_folder = message.date.strftime('%Y%m%d')
-            uploaded_file_url = upload_post_media(file_stream, group_id, date_folder, file_name, mime_type)
-                         
             logging.debug(f"Uploaded file URL: {uploaded_file_url}")
                             
             if not uploaded_file_url:
