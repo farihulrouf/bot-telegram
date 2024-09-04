@@ -284,7 +284,10 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
             # print("---------- message media -----------")
             # print(message.media)
 
+            needUpload = False
+
             if isinstance(message.media, MessageMediaPhoto):
+                needUpload = True
                 logging.debug(f"Downloading photo media from message ID: {message.id}")
                 file_path = await client.download_media(message.media.photo, file=file_stream, progress_callback=report_progress)
                 file_extension = 'jpg'
@@ -329,7 +332,10 @@ async def read_message(client: TelegramClient, message: Message, sender: {}):
                     media_type = "file"
 
             date_folder = message.date.strftime('%Y%m%d')
-            uploaded_file_url = upload_post_media(file_stream, group_id, date_folder, file_name, mime_type)
+
+            uploaded_file_url = ""
+            if needUpload:
+                uploaded_file_url = upload_post_media(file_stream, group_id, date_folder, file_name, mime_type)
 
             message_data["mimetype"] = mime_type
             message_data["file_type"] = media_type
@@ -364,7 +370,7 @@ async def listen_messages(phone: str):
         print("... incoming ...")
 
         user = await event.get_sender()
-        
+
         # user_id = None
         # if user != None:
         #     user_id = user.id
