@@ -100,13 +100,17 @@ async def detail(phone: str, strid: str):
                 file_stream.seek(0)
                 avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg", "image/jpg")
 
+        username = ""
+        if entity.username != None:
+            username = entity.username
+
         response = {
             'name' : (entity.title.encode("ascii", "ignore")).decode(),
             'description': description,
             'original_id' : entity.id,
-            'username' : entity.username,
+            'username' : username,
             'avatar' : avatar,
-            'url': "https://t.me/"+ entity.username,
+            'url': "https://t.me/"+ username,
             'created_at' : int(entity.date.timestamp()),
             'type' : ctype,
             'members' : members_count,
@@ -135,8 +139,8 @@ async def join(phone: str, username_channel: str):
     if not client.is_connected():
         await client.connect()
     try:
-        if username_channel.startswith('@'):
-            username_channel = username_channel[1:]
+        # if username_channel.startswith('@'):
+        #     username_channel = username_channel[1:]
 
         # # Bergabung dengan saluran
         # await client(JoinChannelRequest(username_channel))
@@ -152,10 +156,24 @@ async def join(phone: str, username_channel: str):
         #     result = await client.download_profile_photo(entity, file=file_stream)
         #     if result:
         #         file_stream.seek(0)
-        #         avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg")
+        #         avatar = upload_profile_avatar(file_stream, f"{entity.id}-jpg", "image/jpg")
 
+        # username = entity.username ?? None
         # response = []
         # response.append({
+        #     'name' : (entity.title.encode("ascii", "ignore")).decode(),
+        #     'original_id' : entity.id,
+        #     'username' : entity.username,
+        #     'avatar' : avatar,
+        #     # 'url': "https://t.me/"+ entity.username,
+        #     # 'created_at' : int(entity.date.timestamp()),
+        #     # 'type' : ctype,
+        #     # 'members' : entity.participants_count,
+        #     # 'chats' : None,
+        #     # 'access_hash' : entity.access_hash
+        # })
+
+        # response = {
         #     'name' : (entity.title.encode("ascii", "ignore")).decode(),
         #     'original_id' : entity.id,
         #     'username' : entity.username,
@@ -166,7 +184,7 @@ async def join(phone: str, username_channel: str):
         #     'members' : entity.participants_count,
         #     'chats' : None,
         #     'access_hash' : entity.access_hash
-        # })
+        # }
 
         # section_webhook = "group_search"
         # await webhook_push(section_webhook, {

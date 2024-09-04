@@ -364,6 +364,11 @@ async def listen_messages(phone: str):
         print("... incoming ...")
 
         user = await event.get_sender()
+        
+        # user_id = None
+        # if user != None:
+        #     user_id = user.id
+
         if user.id in senders:
             sender = senders[user.id]
         else:
