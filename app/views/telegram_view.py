@@ -99,7 +99,7 @@ async def get_group_members(
 ):
     try:
         background_tasks.add_task(telegram_group.get_members, phone, channel_username, limit)
-        return {"status": "starting fetch group messages", "username": channel_username}
+        return {"status": "starting fetch group members", "username": channel_username}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
