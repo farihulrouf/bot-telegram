@@ -40,7 +40,9 @@ async def send_message(phone: str, recipient: str, message: str) -> Dict[str, st
         }
 
 
+# Fungsi utama untuk mendapatkan semua channel dan group
 async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
+    # Mendapatkan client dari sesi yang tersedia berdasarkan nomor telepon
     client = sessions.get(phone)
 
     if not client:
@@ -49,36 +51,48 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
 
     logging.debug(f"Session found for phone: {phone}")
 
+    # Menghubungkan client jika belum terkoneksi
     if not client.is_connected():
         logging.debug(f"Connecting client for phone: {phone}")
         await client.connect()
 
     try:
+        # Mengambil dialog dari client
         dialogs = await client.get_dialogs()
         logging.debug(f"Retrieved dialogs for phone: {phone}")
 
         channels = []
         groups = []
 
+        # Iterasi melalui semua dialog untuk memisahkan channel dan group
         for dialog in dialogs:
             entity = dialog.entity
             if isinstance(entity, Channel):
                 name = f"@{entity.username}" if entity.username else f"@{entity.title}"
-                channels.append({'name_channel_group': name, 'status': True})
+                channels.append({
+                    'name_channel_group': name, 
+                    'status': True,  # Status True untuk channel
+                    'id_channel_group': entity.id  # ID dari channel
+                })
             elif isinstance(entity, Chat):
                 name = f"@{entity.title}"
-                groups.append({'name_channel_group': name, 'status': False})
+                groups.append({
+                    'name_channel_group': name, 
+                    'status': False,  # Status False untuk group
+                    'id_channel_group': entity.id  # ID dari group
+                })
 
         logging.debug(f"Extracted channel and group names for phone: {phone}")
 
+        # Membuat respons dari data channel dan group yang diperoleh
         response = ChannelNamesResponseAll(
             total_channels=len(channels),
             total_groups=len(groups),
-            channels_groups=channels + groups
+            channels_groups=channels + groups  # Gabungkan channels dan groups
         )
 
         logging.debug(f"Client disconnected for phone: {phone}")
-        # Jika Anda ingin mendisconnect, aktifkan baris berikut
+        # Jika Anda ingin mendisconnect client setelah selesai, aktifkan baris berikut
         # await client.disconnect()
 
         return response

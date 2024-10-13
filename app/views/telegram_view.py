@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from pydantic import BaseModel
-from app.models.telegram_model import PhoneNumber, VerificationCode, SendMessageRequest
-from app.controllers import auth_controller, telegram_controller
+from app.models.telegram_model import PhoneNumber, VerificationCode, SendMessageRequest, ChannelDetailResponse
+from app.controllers import auth_controller, telegram_controller, chanel_group_handler
 
 router = APIRouter()
 
@@ -43,7 +43,18 @@ async def send_message_endpoint(request: SendMessageRequest):
         raise HTTPException(status_code=500, detail=str(e))
     
 
-
 @router.get("/api/getallchannel")
 async def fetch_all_channels(phone: str):
     return await telegram_controller.get_all_channels(phone)
+
+@router.get("/api/getchannel", response_model=ChannelDetailResponse)
+async def get_channel_details(phone: str = Query(...), channel_username: str = Query(...)):
+    try:
+        response = await chanel_group_handler.get_channel_details(phone, channel_username)
+        if response["status"] == "success":
+            return response["channel_info"]
+        else:
+            raise HTTPException(status_code=400, detail="Failed to get channel details")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    

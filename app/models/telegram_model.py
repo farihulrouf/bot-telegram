@@ -41,7 +41,19 @@ class SendMessageRequest(BaseModel):
 
 class ChannelGroup(BaseModel):
     name_channel_group: str
+    id_channel_group: int  # ID dari channel atau group
     status: bool
+
+
+class ChannelDetailResponse(BaseModel):
+    id: int
+    name: str
+    username: str
+    participants_count: int
+    admins_count: int
+    banned_count: int
+    description: str
+    created_at: str
 
 
 class ChannelNamesResponseAll(BaseModel):
