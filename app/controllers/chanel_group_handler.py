@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import HTTPException
 from app.models.telegram_model import sessions
 import logging
@@ -18,15 +19,12 @@ async def get_channel_details(phone: str, channel_identifier: str):
 
         # Menentukan apakah identifier adalah ID atau username
         if channel_identifier.startswith('-') and channel_identifier[1:].isdigit():
-            # Menganggap sebagai ID negatif
             entity_id = int(channel_identifier)
             entity = await client.get_entity(entity_id)
         elif channel_identifier.isdigit():
-            # Menganggap sebagai ID positif
             entity_id = int(channel_identifier)
             entity = await client.get_entity(entity_id)
         else:
-            # Menganggap sebagai username
             if channel_identifier.startswith('@'):
                 channel_identifier = channel_identifier[1:]
             entity = await client.get_entity(channel_identifier)
@@ -36,26 +34,42 @@ async def get_channel_details(phone: str, channel_identifier: str):
             full_channel = await client(GetFullChannelRequest(channel=entity))
 
             # Ambil peserta
-            participants = await client(GetParticipantsRequest(
-                channel=entity,
-                filter=ChannelParticipantsSearch(""),  # Ambil semua anggota
-                offset=0,  # Mulai dari awal
-                limit=100,  # Batasi jumlah yang diambil
-                hash=0  # Set hash ke 0
-            ))
+            participants = []
+            offset = 0
+            limit = 100  # Jumlah anggota yang diambil per permintaan
 
-            # Debugging: Periksa jumlah peserta yang diambil
-            print(f"Number of participants fetched: {len(participants.users)}")
+            while True:
+                # Ambil peserta dengan delay untuk menghindari rate limiting
+                part = await client(GetParticipantsRequest(
+                    channel=entity,
+                    filter=ChannelParticipantsSearch(""),  # Ambil semua anggota
+                    offset=offset,
+                    limit=limit,
+                    hash=0
+                ))
+
+                # Tambahkan peserta yang diambil ke daftar peserta
+                participants.extend(part.users)
+
+                # Debugging: Tampilkan jumlah peserta yang diambil sejauh ini
+                print(f"Fetched {len(participants)} participants so far...")
+
+                # Jika tidak ada lagi peserta, keluar dari loop
+                if not part.users:
+                    break
+
+                # Update offset untuk permintaan berikutnya
+                offset += len(part.users)
+
+                # Tambahkan delay untuk menghindari rate limiting
+                await asyncio.sleep(2)
 
             # Siapkan data anggota
             members = [{
-                "id": user.id,  # ID pengguna
-                "username": user.username or "No Username",  # Username
-                "phone": user.phone  # Nomor telepon
-            } for user in participants.users if user.phone]  # Hanya menyertakan pengguna dengan nomor telepon
-
-            # Debugging: Periksa data anggota yang diambil
-            print("Check data members:", members)
+                "id": user.id,
+                "username": user.username or "No Username",
+                "phone": user.phone
+            } for user in participants]  # Sertakan semua pengguna
 
             # Siapkan informasi channel
             channel_info = {
@@ -78,4 +92,3 @@ async def get_channel_details(phone: str, channel_identifier: str):
     
     except Exception as e:
         raise Exception(f"Failed to get channel details: {str(e)}")
-
