@@ -2,7 +2,7 @@ import os
 import time
 import asyncio
 import logging
-from typing import Dict, Optional
+from typing import Dict, List,Optional
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from telethon import TelegramClient
@@ -39,6 +39,15 @@ class SendMessageRequest(BaseModel):
     recipient: str  # Username atau nomor telepon penerima
     message: str  # Pesan yang akan dikirim
 
+class ChannelGroup(BaseModel):
+    name_channel_group: str
+    status: bool
+
+
+class ChannelNamesResponseAll(BaseModel):
+    total_channels: int
+    total_groups: int
+    channels_groups: List[ChannelGroup]
 
 def create_client(phone: str) -> TelegramClient:
     session_file = f"sessions/{phone}.session"

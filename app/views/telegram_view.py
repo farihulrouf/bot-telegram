@@ -41,3 +41,9 @@ async def send_message_endpoint(request: SendMessageRequest):
         return {"status": "success", "message": result}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+
+
+@router.get("/api/getallchannel")
+async def fetch_all_channels(phone: str):
+    return await telegram_controller.get_all_channels(phone)
