@@ -10,6 +10,7 @@ sessions/
 
 # Ignore all files in the media directory
 /media/
+__pycache__/
 
 # Ignore all files in the venv directory
 /venv/
