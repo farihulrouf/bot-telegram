@@ -45,15 +45,24 @@ class ChannelGroup(BaseModel):
     status: bool
 
 
+# Definisikan model respons untuk anggota
+class MemberResponse(BaseModel):
+    id: int  # ID pengguna
+    username: Optional[str] = "No Username"  # Username pengguna
+    phone: Optional[str]  # Nomor telepon pengguna
+
+# Definisikan model respons untuk detail channel
 class ChannelDetailResponse(BaseModel):
-    id: int
-    name: str
-    username: str
-    participants_count: int
-    admins_count: int
-    banned_count: int
-    description: str
-    created_at: str
+    id: int  # ID unik channel
+    name: str  # Nama channel
+    username: Optional[str]  # Username channel
+    participants_count: int  # Jumlah peserta dalam channel
+    admins_count: int  # Jumlah admin di channel
+    banned_count: int  # Jumlah peserta yang dilarang
+    description: Optional[str]  # Deskripsi channel
+    created_at: str  # Tanggal pembuatan channel
+    members: List[MemberResponse]  # Daftar anggota
+
 
 
 class ChannelNamesResponseAll(BaseModel):

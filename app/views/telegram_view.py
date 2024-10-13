@@ -47,14 +47,20 @@ async def send_message_endpoint(request: SendMessageRequest):
 async def fetch_all_channels(phone: str):
     return await telegram_controller.get_all_channels(phone)
 
+
 @router.get("/api/getchannel", response_model=ChannelDetailResponse)
-async def get_channel_details(phone: str = Query(...), channel_username: str = Query(...)):
+async def get_channel_details(
+    phone: str = Query(..., description="Nomor telepon pengguna"),
+    channel_username: str = Query(..., description="Username atau ID channel")
+):
     try:
+        # Memanggil fungsi untuk mendapatkan detail channel
         response = await chanel_group_handler.get_channel_details(phone, channel_username)
+        
+        # Memeriksa status respons
         if response["status"] == "success":
             return response["channel_info"]
         else:
             raise HTTPException(status_code=400, detail="Failed to get channel details")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
