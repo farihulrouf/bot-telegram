@@ -38,6 +38,8 @@ class SendMessageRequest(BaseModel):
     phone: str  # Nomor telepon pengirim
     recipient: str  # Username atau nomor telepon penerima
     message: str  # Pesan yang akan dikirim
+    type: str  # "text", "image", "video", "file"
+
 
 class ChannelGroup(BaseModel):
     name_channel_group: str

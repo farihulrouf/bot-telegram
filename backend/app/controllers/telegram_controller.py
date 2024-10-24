@@ -9,10 +9,8 @@ from telethon.tl.types import PeerChannel, Channel, Chat, PeerChannel
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 
 import logging
-async def send_message(phone: str, recipient: str, message: str) -> Dict[str, str]:
-    """Send a message to a user, group, or channel."""
-    print("check", phone)
-
+async def send_message(phone: str, recipient: str, message: str, type: str) -> Dict[str, str]:
+    """Send a message of various types (text, image, video, file) to a user, group, or channel."""
     client: TelegramClient = sessions.get(phone)
 
     if client is None:
@@ -25,20 +23,41 @@ async def send_message(phone: str, recipient: str, message: str) -> Dict[str, st
         if not client.is_connected():
             await client.connect()
 
-        # Mengirim pesan
-        await client.send_message(recipient, message)
-
-        return {
-            "status": "success",
-            "message": "Message sent successfully."
-        }
+        if type == "text":
+            await client.send_message(recipient, message)
+            return {
+                "status": "success",
+                "message": "Text message sent successfully."
+            }
+        elif type == "image":
+            await client.send_file(recipient, message)  # `message` is the path to the image
+            return {
+                "status": "success",
+                "message": "Image sent successfully."
+            }
+        elif type == "video":
+            await client.send_file(recipient, message)  # `message` is the path to the video
+            return {
+                "status": "success",
+                "message": "Video sent successfully."
+            }
+        elif type == "file":
+            await client.send_file(recipient, message)  # `message` is the path to the file
+            return {
+                "status": "success",
+                "message": "File sent successfully."
+            }
+        else:
+            return {
+                "status": "error",
+                "message": "Unsupported message type."
+            }
 
     except Exception as e:
         return {
             "status": "error",
             "message": f"Failed to send message: {str(e)}"
         }
-
 
 async def send_bulk_message(phone: str, recipients: List[str], message: str) -> List[Dict[str, str]]:
     """Send a message to multiple users, groups, or channels."""

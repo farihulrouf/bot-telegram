@@ -36,12 +36,11 @@ async def logout(phone: PhoneNumber):
 @router.post("/api/send_message")
 async def send_message_endpoint(request: SendMessageRequest):
     try:
-        # Menggunakan fungsi controller untuk mengirim pesan
-        result = await telegram_controller.send_message(request.phone, request.recipient, request.message)
-        return {"status": "success", "message": result}
+        result = await telegram_controller.send_message(request.phone, request.recipient, request.message, request.type)
+        return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-    
+       
 
 @router.post("/api/send_bulk_message")
 async def send_bulk_message_endpoint(request: BulkSendMessageRequest):
