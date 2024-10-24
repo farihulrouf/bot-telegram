@@ -65,6 +65,11 @@ class ChannelDetailResponse(BaseModel):
 
 
 
+class BulkSendMessageRequest(BaseModel):
+    phone: str
+    recipients: List[str]
+    message: str
+
 class ChannelNamesResponseAll(BaseModel):
     total_channels: int
     total_groups: int

@@ -40,6 +40,45 @@ async def send_message(phone: str, recipient: str, message: str) -> Dict[str, st
         }
 
 
+async def send_bulk_message(phone: str, recipients: List[str], message: str) -> List[Dict[str, str]]:
+    """Send a message to multiple users, groups, or channels."""
+    client: TelegramClient = sessions.get(phone)
+
+    if client is None:
+        return [{
+            "status": "error",
+            "message": "No active client session found."
+        }]
+
+    results = []
+    
+    try:
+        if not client.is_connected():
+            await client.connect()
+
+        for recipient in recipients:
+            try:
+                await client.send_message(recipient, message)
+                results.append({
+                    "recipient": recipient,
+                    "status": "success",
+                    "message": "Message sent successfully."
+                })
+            except Exception as e:
+                results.append({
+                    "recipient": recipient,
+                    "status": "error",
+                    "message": f"Failed to send message to {recipient}: {str(e)}"
+                })
+
+        return results
+
+    except Exception as e:
+        return [{
+            "status": "error",
+            "message": f"Failed to send bulk messages: {str(e)}"
+        }]
+
 # Fungsi utama untuk mendapatkan semua channel dan group
 async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
     # Mendapatkan client dari sesi yang tersedia berdasarkan nomor telepon
