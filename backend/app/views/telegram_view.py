@@ -36,7 +36,7 @@ async def logout(phone: PhoneNumber):
 @router.post("/api/send_message")
 async def send_message_endpoint(request: SendMessageRequest):
     try:
-        result = await telegram_controller.send_message(request.phone, request.recipient, request.message, request.type)
+        result = await telegram_controller.send_message(request.phone, request.recipient, request.message, request.type, request.caption)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -39,6 +39,7 @@ class SendMessageRequest(BaseModel):
     recipient: str  # Username atau nomor telepon penerima
     message: str  # Pesan yang akan dikirim
     type: str  # "text", "image", "video", "file"
+    caption: Optional[str] = ""  # Caption for media types, defaults to empty string
 
 
 class ChannelGroup(BaseModel):

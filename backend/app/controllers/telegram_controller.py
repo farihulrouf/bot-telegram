@@ -9,7 +9,7 @@ from telethon.tl.types import PeerChannel, Channel, Chat, PeerChannel
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 
 import logging
-async def send_message(phone: str, recipient: str, message: str, type: str) -> Dict[str, str]:
+async def send_message(phone: str, recipient: str, message: str, type: str, caption: str = "") -> Dict[str, str]:
     """Send a message of various types (text, image, video, file) to a user, group, or channel."""
     client: TelegramClient = sessions.get(phone)
 
@@ -30,19 +30,19 @@ async def send_message(phone: str, recipient: str, message: str, type: str) -> D
                 "message": "Text message sent successfully."
             }
         elif type == "image":
-            await client.send_file(recipient, message)  # `message` is the path to the image
+            await client.send_file(recipient, message, caption=caption)  # `message` is the path to the image
             return {
                 "status": "success",
                 "message": "Image sent successfully."
             }
         elif type == "video":
-            await client.send_file(recipient, message)  # `message` is the path to the video
+            await client.send_file(recipient, message, caption=caption)  # `message` is the path to the video
             return {
                 "status": "success",
                 "message": "Video sent successfully."
             }
         elif type == "file":
-            await client.send_file(recipient, message)  # `message` is the path to the file
+            await client.send_file(recipient, message, caption=caption)  # `message` is the path to the file
             return {
                 "status": "success",
                 "message": "File sent successfully."
