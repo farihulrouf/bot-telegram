@@ -13,13 +13,13 @@ async def login(background_tasks: BackgroundTasks, phone: PhoneNumber):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+        
 @router.post("/api/verify")
 async def verify(code: VerificationCode):
     try:
         return await auth_controller.verify(code)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/api/logout")
 async def logout(phone: PhoneNumber):

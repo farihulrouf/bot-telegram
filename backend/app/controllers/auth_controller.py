@@ -7,6 +7,7 @@ from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 from fastapi.encoders import jsonable_encoder
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, active_clients
+from fastapi import APIRouter, HTTPException
 
 # Load environment variables
 load_dotenv()
@@ -19,46 +20,51 @@ def list_devices(query: str = None) -> Dict[str, Union[str, list]]:
         "data": devices
     }
 
+# Saat login, menyimpan client dan phone_code_hash
 async def login(phone: PhoneNumber) -> Dict[str, str]:
-    """Log in to Telegram using the specified phone number."""
     try:
         client = create_client(phone.phone)
         await client.connect()
-        await client.send_code_request(phone.phone)
-        sessions[phone.phone] = client
+        sent_code = await client.send_code_request(phone.phone)
+        
+        # Simpan client dan phone_code_hash dalam dictionary
+        sessions[phone.phone] = {
+            'client': client,
+            'phone_code_hash': sent_code.phone_code_hash
+        }
         logging.debug(f"Session created and stored for phone: {phone.phone}")
         return {"status": "code_sent"}
     except Exception as e:
         logging.error(f"Login failed for {phone.phone}: {str(e)}")
         raise Exception(f"Failed to login: {str(e)}")
 
-async def verify(code: VerificationCode) -> Dict[str, Union[str, Dict]]:
-    """Verify the login code and sign in the user."""
+async def verify(code: VerificationCode):
     try:
-        client = sessions.get(code.phone)
-        if not client:
+        # Ambil session data
+        session_data = sessions.get(code.phone)
+        if not session_data:
             raise Exception("Session not found")
+
+        # Ambil client dan phone_code_hash dari session data
+        client = session_data['client']
+        phone_code_hash = session_data['phone_code_hash']
 
         if not client.is_connected():
             await client.connect()
 
-        await client.sign_in(code.phone, code.code)
+        # Gunakan phone_code_hash dalam proses sign in
+        await client.sign_in(code.phone, code.code, phone_code_hash=phone_code_hash)
 
         if await client.is_user_authorized():
-            return await handle_authorized_user(client)
-
-        elif code.password:
-            await client.sign_in(password=code.password)
-            return await handle_authorized_user(client)
+            return {"status": "success", "message": "User authorized"}
         else:
-            raise Exception("2FA required but no password provided")
+            raise Exception("Verification failed.")
 
-    except SessionPasswordNeededError:
-        logging.debug("2FA is required for this account")
-        return {"status": "2fa_required"}
     except Exception as e:
-        logging.error(f"Failed to verify code: {str(e)}")
-        raise Exception(f"Failed to verify code: {str(e)}")
+        logging.error(f"Error in verify: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 
 async def handle_authorized_user(client: TelegramClient) -> Dict[str, Union[str, Dict]]:
     """Handle actions after the user is authorized."""

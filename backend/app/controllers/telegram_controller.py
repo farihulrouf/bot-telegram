@@ -9,9 +9,11 @@ from telethon.tl.types import PeerChannel, Channel, Chat, PeerChannel
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 
 import logging
+
+
 async def send_message(phone: str, recipient: str, message: str, type: str, caption: str = "") -> Dict[str, str]:
     """Send a message of various types (text, image, video, file) to a user, group, or channel."""
-    client: TelegramClient = sessions.get(phone)
+    client = sessions.get(phone)  # Mengambil client dari sessions berdasarkan nomor telepon
 
     if client is None:
         return {
@@ -23,6 +25,7 @@ async def send_message(phone: str, recipient: str, message: str, type: str, capt
         if not client.is_connected():
             await client.connect()
 
+        # Mengirim pesan berdasarkan tipe
         if type == "text":
             await client.send_message(recipient, message)
             return {
@@ -30,19 +33,19 @@ async def send_message(phone: str, recipient: str, message: str, type: str, capt
                 "message": "Text message sent successfully."
             }
         elif type == "image":
-            await client.send_file(recipient, message, caption=caption)  # `message` is the path to the image
+            await client.send_file(recipient, message, caption=caption)  # `message` adalah path ke gambar
             return {
                 "status": "success",
                 "message": "Image sent successfully."
             }
         elif type == "video":
-            await client.send_file(recipient, message, caption=caption)  # `message` is the path to the video
+            await client.send_file(recipient, message, caption=caption)  # `message` adalah path ke video
             return {
                 "status": "success",
                 "message": "Video sent successfully."
             }
         elif type == "file":
-            await client.send_file(recipient, message, caption=caption)  # `message` is the path to the file
+            await client.send_file(recipient, message, caption=caption)  # `message` adalah path ke file
             return {
                 "status": "success",
                 "message": "File sent successfully."
@@ -54,6 +57,7 @@ async def send_message(phone: str, recipient: str, message: str, type: str, capt
             }
 
     except Exception as e:
+        logging.error(f"Failed to send message: {str(e)}")  # Mencatat error ke log
         return {
             "status": "error",
             "message": f"Failed to send message: {str(e)}"
