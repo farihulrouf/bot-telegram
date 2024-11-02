@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, Security
+from fastapi import APIRouter, HTTPException, Depends, Security, Query
 from fastapi.security import OAuth2PasswordBearer
 from app.models.telegram_model import (
     PhoneNumber, VerificationCode, SendMessageRequest, 
@@ -10,6 +10,10 @@ from app.database.db import get_db  # Ensure this import is correct
 from sqlalchemy.orm import Session
 import logging
 from app.controllers.telegram_controller import get_all_contacts
+
+from app.models.telegram_model import MessagesResponse
+from app.controllers.handler_message import read_all_messages
+from typing import Optional
 
 # Define the OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
@@ -100,3 +104,19 @@ async def get_channel_details(phone: str, channel_username: str):
 @router.get("/api/get-all-contacts/")
 async def api_get_all_contacts(phone: str):
     return await get_all_contacts(phone)
+
+
+
+@router.get("/api/read_messages")
+async def get_messages(
+    phone: str,
+    channel_identifier: str,
+    limit: Optional[int] = Query(default=None)
+):
+    try:
+        messages = await read_all_messages(phone, channel_identifier, limit)
+        return messages
+    except HTTPException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal Server Error")

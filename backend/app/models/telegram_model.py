@@ -76,6 +76,15 @@ class ChannelNamesResponseAll(BaseModel):
     total_groups: int
     channels_groups: List[ChannelGroup]
 
+class MessageResponse(BaseModel):
+    type: str
+    message: Optional[str] = None  # Pesan atau keterangan jika media
+    caption: Optional[str] = None   # Keterangan media, jika ada
+
+class MessagesResponse(BaseModel):
+    total: int
+    messages: List[MessageResponse]
+
 def create_client(phone: str) -> TelegramClient:
     session_file = f"sessions/{phone}.session"
     return TelegramClient(session_file, int(API_ID), API_HASH)
