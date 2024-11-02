@@ -18,6 +18,10 @@ __pycache__/
 # Ignore .env file
 .env
 
+
+# Ignore database files
+*.db
+
 # Optionally, you can add other common ignore patterns
 # Ignore binaries
 *.exe

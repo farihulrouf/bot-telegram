@@ -23,12 +23,7 @@ active_clients: Dict[str, asyncio.Task] = {}
 senders = {}
 start_time = time.time()
 
-class MessageRequest(BaseModel):
-    phone: str = Field(..., description="Nomor telepon untuk session Telegram")
-    group_id: str = Field(..., description="ID grup atau saluran tujuan")
-    message: str = Field(..., description="Pesan yang akan dikirim")
-    type: str = Field(..., description="Tipe pesan (text, image, video, file)")
-    caption: str = Field("", description="Keterangan untuk gambar atau video (opsional)")
+
 
 class PhoneNumber(BaseModel):
     phone: str

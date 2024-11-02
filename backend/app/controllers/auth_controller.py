@@ -8,9 +8,25 @@ from telethon.errors import SessionPasswordNeededError
 from fastapi.encoders import jsonable_encoder
 from app.models.telegram_model import PhoneNumber, VerificationCode, create_client, sessions, active_clients
 from fastapi import APIRouter, HTTPException
+from sqlalchemy.orm import Session
+from passlib.context import CryptContext
+from fastapi import HTTPException, status
+from app.models.user import UserCreate, User
+from datetime import datetime, timedelta
+from jose import JWTError, jwt
+from fastapi import Security, Depends
 
+# Setup untuk hashing password
 # Load environment variables
 load_dotenv()
+
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+ALGORITHM = os.getenv("ALGORITHM")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES"))
+
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def list_devices(query: str = None) -> Dict[str, Union[str, list]]:
     """List devices based on the query."""
@@ -119,3 +135,40 @@ def process_bytes_in_dict(data: dict) -> dict:
         elif isinstance(value, list):
             data[key] = [process_bytes_in_dict(v) if isinstance(v, dict) else v for v in value]
     return data
+
+
+def hash_password(password: str) -> str:
+    return pwd_context.hash(password)
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    return pwd_context.verify(plain_password, hashed_password)
+
+def create_user(db: Session, user: UserCreate) -> User:
+    db_user = User(
+        username=user.username,
+        email=user.email,
+        hashed_password=hash_password(user.password)
+    )
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+def get_user(db: Session, username: str) -> User:
+    return db.query(User).filter(User.username == username).first()
+
+async def authenticate_user(db: Session, username: str, password: str) -> User:
+    user = get_user(db, username)
+    if user is None or not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+def create_access_token(data: dict, expires_delta: timedelta = None) -> str:
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
