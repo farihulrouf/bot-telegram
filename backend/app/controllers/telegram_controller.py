@@ -2,7 +2,7 @@ from fastapi import HTTPException
 from typing import Dict
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
-from app.models.telegram_model import sessions, ChannelNamesResponseAll  # Asumsi Anda menyimpan session di sini
+from app.models.telegram_model import sessions, ChannelNamesResponseAll, SendMessageRequest  # Asumsi Anda menyimpan session di sini
 from typing import List, Dict, Any
 from telethon.tl.functions.messages import GetDialogsRequest
 from telethon.tl.types import PeerChannel, Channel, Chat, PeerChannel
@@ -10,10 +10,9 @@ from telethon.errors.rpcerrorlist import ChannelsTooMuchError
 
 import logging
 
-
-async def send_message(phone: str, recipient: str, message: str, type: str, caption: str = "") -> Dict[str, str]:
-    """Send a message of various types (text, image, video, file) to a user, group, or channel."""
-    client = sessions.get(phone)  # Mengambil client dari sessions berdasarkan nomor telepon
+async def send_message(request: SendMessageRequest):
+    """Send a message to a Telegram group or channel."""
+    client: TelegramClient = sessions.get(request.phone)
 
     if client is None:
         return {
@@ -26,29 +25,17 @@ async def send_message(phone: str, recipient: str, message: str, type: str, capt
             await client.connect()
 
         # Mengirim pesan berdasarkan tipe
-        if type == "text":
-            await client.send_message(recipient, message)
+        if request.type == "text":
+            await client.send_message(request.recipient, request.message)
             return {
                 "status": "success",
                 "message": "Text message sent successfully."
             }
-        elif type == "image":
-            await client.send_file(recipient, message, caption=caption)  # `message` adalah path ke gambar
+        elif request.type in ["image", "video", "file"]:
+            await client.send_file(request.recipient, request.message, caption=request.caption)
             return {
                 "status": "success",
-                "message": "Image sent successfully."
-            }
-        elif type == "video":
-            await client.send_file(recipient, message, caption=caption)  # `message` adalah path ke video
-            return {
-                "status": "success",
-                "message": "Video sent successfully."
-            }
-        elif type == "file":
-            await client.send_file(recipient, message, caption=caption)  # `message` adalah path ke file
-            return {
-                "status": "success",
-                "message": "File sent successfully."
+                "message": f"{request.type.capitalize()} sent successfully."
             }
         else:
             return {
