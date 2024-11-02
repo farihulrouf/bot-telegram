@@ -1,10 +1,13 @@
-from fastapi import FastAPI, BackgroundTasks
-import asyncio
-import os
+from fastapi import FastAPI
+from app.utils.utils import add_cors_middleware  # Import konfigurasi CORS
 from app.models.telegram_model import create_client, sessions, active_clients
 from app.views import telegram_view
 from app.database.db import Base, engine
+
 app = FastAPI()
+
+# Menambahkan middleware CORS
+add_cors_middleware(app)
 
 # Mengimpor router
 app.include_router(telegram_view.router)
@@ -21,5 +24,3 @@ async def startup_event():
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
-
-
