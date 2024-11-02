@@ -7,8 +7,12 @@ from typing import List, Dict, Any
 from telethon.tl.functions.messages import GetDialogsRequest
 from telethon.tl.types import PeerChannel, Channel, Chat, PeerChannel
 from telethon.errors.rpcerrorlist import ChannelsTooMuchError
-
+from telethon.tl.functions.contacts import GetContactsRequest
+from telethon.tl.types import Contact
 import logging
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 async def send_message(request: SendMessageRequest):
     """Send a message to a Telegram group or channel."""
@@ -95,20 +99,20 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
     client = sessions.get(phone)
 
     if not client:
-        logging.error(f"Session not found for phone: {phone}")
+        logger.error(f"Session not found for phone: {phone}")
         raise HTTPException(status_code=404, detail="Session not found")
 
-    logging.debug(f"Session found for phone: {phone}")
+    logger.debug(f"Session found for phone: {phone}")
 
     # Menghubungkan client jika belum terkoneksi
     if not client.is_connected():
-        logging.debug(f"Connecting client for phone: {phone}")
+        logger.debug(f"Connecting client for phone: {phone}")
         await client.connect()
 
     try:
         # Mengambil dialog dari client
         dialogs = await client.get_dialogs()
-        logging.debug(f"Retrieved dialogs for phone: {phone}")
+        logger.debug(f"Retrieved {len(dialogs)} dialogs for phone: {phone}")
 
         channels = []
         groups = []
@@ -119,19 +123,19 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
             if isinstance(entity, Channel):
                 name = f"@{entity.username}" if entity.username else f"@{entity.title}"
                 channels.append({
-                    'name_channel_group': name, 
+                    'name_channel_group': name,
                     'status': True,  # Status True untuk channel
                     'id_channel_group': entity.id  # ID dari channel
                 })
             elif isinstance(entity, Chat):
                 name = f"@{entity.title}"
                 groups.append({
-                    'name_channel_group': name, 
+                    'name_channel_group': name,
                     'status': False,  # Status False untuk group
                     'id_channel_group': entity.id  # ID dari group
                 })
 
-        logging.debug(f"Extracted channel and group names for phone: {phone}")
+        logger.debug(f"Extracted {len(channels)} channels and {len(groups)} groups for phone: {phone}")
 
         # Membuat respons dari data channel dan group yang diperoleh
         response = ChannelNamesResponseAll(
@@ -139,16 +143,66 @@ async def get_all_channels(phone: str) -> ChannelNamesResponseAll:
             total_groups=len(groups),
             channels_groups=channels + groups  # Gabungkan channels dan groups
         )
+        
+        #logger.debug(f"Total channels: {response.total_channels}, Total groups: {response.total_groups}")
 
-        logging.debug(f"Client disconnected for phone: {phone}")
         # Jika Anda ingin mendisconnect client setelah selesai, aktifkan baris berikut
         # await client.disconnect()
 
         return response
 
     except ChannelsTooMuchError as e:
-        logging.error(f"Failed to get channels: {str(e)}")
+        logger.error(f"Failed to get channels: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get channels: {str(e)}")
     except Exception as e:
-        logging.error(f"Failed to get channels and groups: {str(e)}")
+        logger.error(f"Failed to get channels and groups: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to get channels and groups: {str(e)}")
+
+
+async def get_all_contacts(phone: str) -> Dict[str, Any]:
+    """Get all contacts for a given phone session."""
+    client = sessions.get(phone)
+
+    if not client:
+        logger.error(f"Session not found for phone: {phone}")
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    logger.debug(f"Session found for phone: {phone}")
+
+    if not client.is_connected():
+        logger.debug(f"Connecting client for phone: {phone}")
+        await client.connect()
+
+    try:
+        contacts = await client(GetContactsRequest(0))  # 0 untuk mengambil semua kontak
+        logger.debug(f"Retrieved {len(contacts.contacts)} contacts for phone: {phone}")
+
+        contact_list = []
+        
+        for contact in contacts.contacts:
+            if isinstance(contact, Contact):
+                # Ambil user_id dari contact
+                user_id = contact.user_id  # user_id dari Contact
+                username = None
+                # Ambil informasi pengguna menggunakan user_id
+                if user_id:
+                    try:
+                        user = await client.get_entity(user_id)
+                        username = f"@{user.username}" if user.username else None
+
+                    except Exception as e:
+                        logger.warning(f"Could not retrieve user for contact {contact}: {str(e)}")
+
+                contact_list.append({
+                    "username": username,
+                    "id_user": user_id,
+                })
+
+        return {
+            "total_contact": len(contact_list),
+            "contacts": contact_list
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get contacts: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get contacts: {str(e)}")

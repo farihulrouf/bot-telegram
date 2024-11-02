@@ -8,6 +8,8 @@ from app.controllers import auth_controller, telegram_controller, chanel_group_h
 from app.models.user import UserCreate, UserOut, Token, UserLogin
 from app.database.db import get_db  # Ensure this import is correct
 from sqlalchemy.orm import Session
+import logging
+from app.controllers.telegram_controller import get_all_contacts
 
 # Define the OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
@@ -17,11 +19,14 @@ router = APIRouter()
 
 # Define a function to get the current user
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    # Verify the token
+    logging.info("Validating token...")
     user = auth_controller.verify_token(token)
     if not user:
+        logging.warning("Invalid or expired token")
         raise HTTPException(status_code=403, detail="Invalid or expired token")
+    logging.info(f"User retrieved: {user}")
     return user
+
 
 # Helper function for handling background tasks
 async def handle_background_task(func, *args):
@@ -74,7 +79,14 @@ async def send_bulk_message_endpoint(request: BulkSendMessageRequest):
 # Protected route: /api/getallchannel
 @router.get("/api/getallchannel", dependencies=[Depends(get_current_user)])
 async def fetch_all_channels(phone: str):
-    return await telegram_controller.get_all_channels(phone)
+    logging.info(f"Fetching channels for phone: {phone}")
+    try:
+        channels = await telegram_controller.get_all_channels(phone)
+        logging.info(f"Channels fetched successfully: {channels}")
+        return channels
+    except Exception as e:
+        logging.error(f"Error fetching channels: {str(e)}")
+        raise
 
 # Protected route: /api/getchannel
 @router.get("/api/getchannel", response_model=ChannelDetailResponse, dependencies=[Depends(get_current_user)])
@@ -83,3 +95,8 @@ async def get_channel_details(phone: str, channel_username: str):
     if response["status"] != "success":
         raise HTTPException(status_code=400, detail="Failed to get channel details")
     return response["channel_info"]
+
+
+@router.get("/api/get-all-contacts/")
+async def api_get_all_contacts(phone: str):
+    return await get_all_contacts(phone)
